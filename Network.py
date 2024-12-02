@@ -6,6 +6,9 @@ import torch.nn as nn
 import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
+from skimage import color
+from PIL import Image
+import torch.nn.functional as F
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -117,9 +120,9 @@ class ZhangColorizationNetwork(nn.Module):
             of the bw image, feed the network
         '''
         # Add here conversion to LAB color scheme
-        original_l_channel, resized_l_channel = ImageDataset.preprocess_img(image)
+        original_l_channel, resized_l_channel = ZhangColorizationNetwork.preprocess_img(image)
 
-        conv1 = self.conv1(resized_l_channel) #here should go a normalization for L channel
+        conv1 = self.conv1(resized_l_channel)
         conv2 = self.conv2(conv1)
         conv3 = self.conv3(conv2)
         conv4 = self.conv4(conv3)
@@ -130,9 +133,58 @@ class ZhangColorizationNetwork(nn.Module):
 
         ab_channel = self.ab(conv8)
 
-        return ab_channel
+        return conv8, ab_channel, ZhangColorizationNetwork.postprocess_tens(original_l_channel, ab_channel)
+
+    @staticmethod
+    def res_image(image, new_size=(256, 256), resample=3):
+        return np.asarray(Image.fromarray(image).resize((new_size[1], new_size[0]), resample=resample))
+
+    @staticmethod
+    def preprocess_img(img_rgb_orig, new_size=(256, 256), resample=3):
+
+        img_rgb_rs = ZhangColorizationNetwork.res_image(img_rgb_orig, new_size=new_size, resample=resample)
+
+        img_lab_orig = color.rgb2lab(img_rgb_orig)
+        img_lab_rs = color.rgb2lab(img_rgb_rs)
+
+        img_l_orig = img_lab_orig[:, :, 0]
+        img_l_rs = img_lab_rs[:, :, 0]
+
+        tens_orig_l = torch.Tensor(img_l_orig)[None, None, :, :]
+        tens_rs_l = torch.Tensor(img_l_rs)[None, None, :, :]
+
+        return tens_orig_l, tens_rs_l
 
 
+    @staticmethod
+    def postprocess_tens(tens_orig_l, out_ab):
+        # tens_orig_l 	1 x 1 x H_orig x W_orig
+        # out_ab 		1 x 2 x H x W
+
+        size_orig = tens_orig_l.shape[2:]
+        size = out_ab.shape[2:]
+
+        # call resize function if needed
+        if size_orig[0] != size[0] or size_orig[1] != size[1]:
+            out_ab_orig = F.interpolate(out_ab, size=size_orig, mode='bilinear')
+        else:
+            out_ab_orig = out_ab
+
+        out_lab_orig = torch.cat((tens_orig_l, out_ab_orig), dim=1)
+        return color.lab2rgb(out_lab_orig.data.cpu().numpy()[0, ...].transpose((1, 2, 0)))
+
+
+    def point_estimate_H(self,Z_predicted):
+        T = 1  # defines how the temperature of the image is re-adjusted (1 -> no changes)
+
+        # First compute fT(z)
+        num = torch.exp(torch.log(Z_predicted) / T)
+        den = 0
+        for q in range(Z_predicted.size(2)):
+            channel = Z_predicted[:, :, q]
+            den += torch.exp(torch.log(channel) / T)
+
+        return torch.mean(num / den, dim=(0, 1))
 
 def zhang_train(model, trainloader, validloader, device, optimizer, epochs=10):
     """
@@ -158,16 +210,22 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=10):
     for epoch in range(epochs):
         model.train()  # Set the model to training mode
         running_loss = 0.0
-        for resized_l_channel, original_l_channel, image in trainloader:
-            resized_l_channel = resized_l_channel.to(device)
+        for image in trainloader:
+            image = image.to(device)
             optimizer.zero_grad()
 
-            ab_groundtruth = LabNormalization.get_ab_channel(image)
-            ab_output = model(resized_l_channel) # Z_predicted
+            # Get the LAB original image
+            img_lab_orig = color.rgb2lab(ZhangColorizationNetwork.res_image(image))
+            # Extract the ground truth ab and convert it to tensor
+            ab_groundtruth = img_lab_orig[:,:,1:2]
+            ab_ground_tensor = torch.Tensor(ab_groundtruth)[None, 2, :, :]
+            # Apply soft-encoding (using nearest neighbor) to map Yab to Zab
+            Z_ground = inverse_H_mapping(ab_ground_tensor)
 
-            # Map the ab value of the ground truth using Z function
+            Z_predicted, ab_output, predicted_value = model(image) # Z_predicted
 
-            loss = criterion(outputs, labels) # TO DEFINE
+            # Compute the custom loss over the Z space
+            loss = multinomial_cross_entropy_loss_L(Z_predicted=Z_predicted, Z_ground_truth=Z_ground) # TO DEFINE
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -179,10 +237,11 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=10):
         model.eval()  # Set the model to evaluation mode
         running_loss = 0.0
         with torch.no_grad():
-            for images, labels in validloader:
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
-                loss = criterion(outputs, labels)
+            for image in validloader:
+                image = image.to(device)
+                ab_output = model(image)
+                ab_groundtruth = LabNormalization.get_ab_channel(image)
+                loss = multinomial_cross_entropy_loss_L(Z_predicted=ab_output, Z_ground_truth=ab_groundtruth) # TO DEFINE
                 running_loss += loss.item()
 
         valid_loss = running_loss / len(validloader)
@@ -191,22 +250,40 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=10):
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
 
 
+# Custom loss function
+def multinomial_cross_entropy_loss_L(Z_predicted, Z_ground_truth):
+    loss = torch.zeroes()
+    for h, w in range(Z_ground_truth.size(0,1)):
+        for q in range(Z_ground_truth.size(2)):
+            loss += Z_ground_truth[h,w,q] * torch.log(Z_predicted[h,w,q])
 
-#def multinomial_cross_entropy_loss_L(Z_predicted, Z_ground_truth):
+    loss = - loss
+
+    return loss
 
 
+# To obtain Z_ground_truth we define the relative mapping H^(-1)
+def gaussian_weight(distances, sigma):
+    return torch.exp(-distances ** 2 / (2 * sigma ** 2))
 
 
-# To obtain Z_ground_truth I must define H function and the relative H^(-1)
-def point_estimate_H(Z_predicted):
-    T = 1 # defines how the temperature of the image is re-adjusted (1 -> no changes)
+def inverse_H_mapping(ab_channels, sigma=5):
+    B, C, H, W = ab_channels.shape  # Assuming shape is [Batch, 2, Height, Width]
+    output = torch.zeros_like(ab_channels)
 
-    # First compute fT(z)
-    num = torch.exp(torch.log(Z_predicted)/T)
-    den = 0
-    for q in range(Z_predicted.size(2)):
-        channel = Z_predicted[:, :, q]
-        den += torch.exp(torch.log(channel) / T)
+    ab_flat = ab_channels.permute(0, 2, 3, 1).reshape(-1, 2)  # [N, 2] where N = B*H*W
 
-    return torch.mean(num/den, dim=(0,1))
+    distances = torch.cdist(ab_flat.unsqueeze(0), ab_flat.unsqueeze(0), p=2).squeeze(0)  # [N, N]
+
+    knn_distances, knn_indices = torch.topk(distances, k=5, largest=False, dim=1)
+
+    for i in range(knn_distances.shape[0]):
+        weights = gaussian_weight(knn_distances[i], sigma)  # Apply Gaussian weighting
+        neighbors = ab_flat[knn_indices[i]]  # Get the 5-nearest neighbors
+        weighted_sum = torch.sum(neighbors * weights.unsqueeze(1), dim=0)
+
+        output_flat = weighted_sum / torch.sum(weights)  # Normalize weights
+
+    output = output_flat.view(B, H, W, C).permute(0, 3, 1, 2)
+    return output
 

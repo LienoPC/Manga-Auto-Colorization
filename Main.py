@@ -9,7 +9,7 @@ from torchvision import models, transforms, datasets
 from torchsummary import summary
 
 from ImageDataset import ImageDataset
-from Network import ZhangColorizationNetwork
+from Network import ZhangColorizationNetwork, zhang_train
 import matplotlib.pyplot as plt
 import kornia
 
@@ -32,5 +32,5 @@ if __name__ == '__main__':
 
     train_loader = torch.utils.data.DataLoader(datasetTest)
 
-    view_dataset_sample(datasetTest)
 
+    module = ZhangColorizationNetwork()
