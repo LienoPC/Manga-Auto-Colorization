@@ -10,14 +10,6 @@ from skimage import color
 from PIL import Image
 import torch.nn.functional as F
 
-from torch.utils.data import DataLoader, SubsetRandomSampler
-
-from torchvision import models, transforms, datasets
-from torchsummary import summary
-
-from ImageDataset import LabNormalization, ImageDataset
-
-
 class ZhangColorizationNetwork(nn.Module):
     def __init__(self):
         super(ZhangColorizationNetwork,self).__init__()
@@ -59,16 +51,16 @@ class ZhangColorizationNetwork(nn.Module):
             nn.ReLU(True),
             nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1, stride=1, bias=True),
             nn.ReLU(True),
-            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1, stride=2, bias=True),
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1, stride=1, bias=True),
             nn.ReLU(True),
             nn.BatchNorm2d(512))
 
         self.conv5 = nn.Sequential(
-            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1, stride=1, dilation=2, bias=True),
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=2, stride=1, dilation=2, bias=True),
             nn.ReLU(True),
-            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1, stride=1, dilation=2, bias=True),
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=2, stride=1, dilation=2, bias=True),
             nn.ReLU(True),
-            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1, stride=1, dilation=2, bias=True),
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=2, stride=1, dilation=2, bias=True),
             nn.ReLU(True),
             nn.BatchNorm2d(512))
 
@@ -119,10 +111,7 @@ class ZhangColorizationNetwork(nn.Module):
             Starting from the L channel extracted from the colored image (during training) or from the L channel
             of the bw image, feed the network
         '''
-        # Add here conversion to LAB color scheme
-        original_l_channel, resized_l_channel = ZhangColorizationNetwork.preprocess_img(image)
-
-        conv1 = self.conv1(resized_l_channel)
+        conv1 = self.conv1(image)
         conv2 = self.conv2(conv1)
         conv3 = self.conv3(conv2)
         conv4 = self.conv4(conv3)
@@ -133,7 +122,7 @@ class ZhangColorizationNetwork(nn.Module):
 
         ab_channel = self.ab(conv8)
 
-        return conv8, ab_channel, ZhangColorizationNetwork.postprocess_tens(original_l_channel, ab_channel)
+        return conv8, ab_channel
 
     @staticmethod
     def res_image(image, new_size=(256, 256), resample=3):
@@ -145,14 +134,13 @@ class ZhangColorizationNetwork(nn.Module):
         img_rgb_rs = ZhangColorizationNetwork.res_image(img_rgb_orig, new_size=new_size, resample=resample)
 
         img_lab_orig = color.rgb2lab(img_rgb_orig)
-        img_lab_rs = color.rgb2lab(img_rgb_rs)
+        img_lab_rs = color.rgb2lab(img_rgb_orig)
 
         img_l_orig = img_lab_orig[:, :, 0]
         img_l_rs = img_lab_rs[:, :, 0]
 
-        tens_orig_l = torch.Tensor(img_l_orig)[None, None, :, :]
-        tens_rs_l = torch.Tensor(img_l_rs)[None, None, :, :]
-
+        tens_orig_l = torch.Tensor(img_l_orig)[None, :, :]
+        tens_rs_l = torch.Tensor(img_l_rs)[None, :, :]
         return tens_orig_l, tens_rs_l
 
 
@@ -186,7 +174,7 @@ class ZhangColorizationNetwork(nn.Module):
 
         return torch.mean(num / den, dim=(0, 1))
 
-def zhang_train(model, trainloader, validloader, device, optimizer, epochs=10):
+def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
     """
       Trains a PyTorch model and returns the training and validation losses.
 
@@ -210,20 +198,21 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=10):
     for epoch in range(epochs):
         model.train()  # Set the model to training mode
         running_loss = 0.0
-        for image in trainloader:
-            image = image.to(device)
-            optimizer.zero_grad()
+        for l_original, l_resized, img_lab_orig in trainloader:
 
             # Get the LAB original image
-            img_lab_orig = color.rgb2lab(ZhangColorizationNetwork.res_image(image))
+            print(img_lab_orig.shape)
+            optimizer.zero_grad()
+            print(l_resized.shape)
+            l_resized = l_resized.to(device)
+
             # Extract the ground truth ab and convert it to tensor
-            ab_groundtruth = img_lab_orig[:,:,1:2]
-            ab_ground_tensor = torch.Tensor(ab_groundtruth)[None, 2, :, :]
+            ab_groundtruth = img_lab_orig[:,1:3,:,:]
             # Apply soft-encoding (using nearest neighbor) to map Yab to Zab
-            Z_ground = inverse_H_mapping(ab_ground_tensor)
+            Z_ground = inverse_H_mapping(ab_groundtruth)
 
-            Z_predicted, ab_output, predicted_value = model(image) # Z_predicted
-
+            Z_predicted, ab_output = model(l_resized) # Z_predicted
+            ZhangColorizationNetwork.postprocess_tens(l_original, ab_output)
             # Compute the custom loss over the Z space
             loss = multinomial_cross_entropy_loss_L(Z_predicted=Z_predicted, Z_ground_truth=Z_ground) # TO DEFINE
             loss.backward()
@@ -269,6 +258,7 @@ def gaussian_weight(distances, sigma):
 
 def inverse_H_mapping(ab_channels, sigma=5):
     B, C, H, W = ab_channels.shape  # Assuming shape is [Batch, 2, Height, Width]
+    print(f"Batch:{B}, Channels: {C}, Height: {H}, Width: {W}")
     output = torch.zeros_like(ab_channels)
 
     ab_flat = ab_channels.permute(0, 2, 3, 1).reshape(-1, 2)  # [N, 2] where N = B*H*W
@@ -286,4 +276,25 @@ def inverse_H_mapping(ab_channels, sigma=5):
 
     output = output_flat.view(B, H, W, C).permute(0, 3, 1, 2)
     return output
+
+
+class LabNormalization():
+
+    def __init__(self):
+        self.l_channel_norm = 100
+        self.ab_channel_norm = 110
+
+    @staticmethod
+    def get_l_channel(x):
+        l_channel = x[:, :, 0].float()
+        l_channel = l_channel / 255.0
+        l_channel = l_channel.unsqueeze(0).unsqueeze(0)
+        return l_channel
+
+    @staticmethod
+    def get_ab_channel(x):
+        l_channel = x[:, :, 0].float()
+        l_channel = l_channel / 255.0
+        l_channel = l_channel.unsqueeze(0).unsqueeze(0)
+        return l_channel
 

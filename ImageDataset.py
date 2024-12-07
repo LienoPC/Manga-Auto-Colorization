@@ -5,15 +5,18 @@ from torchvision.io import read_image
 import numpy as np
 from PIL import Image
 import torch
+from skimage import color
+
+from Network import ZhangColorizationNetwork
 
 
 class ImageDataset(Dataset):
 
-    def __init__(self, img_dir, transform=None):
+    def __init__(self, img_dir, resize=None):
         self.img_dir = img_dir
+        self.resize = resize
         # Should be "empty"
         self.images = []
-        self.transform = transform
         for img_path in os.listdir(img_dir):
             self.images.append(os.path.join(img_dir,img_path))
         ann_file = pd.DataFrame(self.images)
@@ -26,9 +29,12 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.images.iloc[idx,0]
         image = self.load_img(str(img_path)) # Transform the image in tensor
-        if self.transform:
-            image = self.transform(image)
-        return image
+        if self.resize:
+            image = ZhangColorizationNetwork.res_image(image, self.resize)
+        image = np.asarray(image).copy()  # Ensure the array is writable
+        l_original, l_resized = ZhangColorizationNetwork.preprocess_img(image)
+        img_lab_orig = torch.Tensor(color.rgb2lab(image))[:, :, :].permute((2,0,1))
+        return l_original, l_resized, img_lab_orig
 
     @staticmethod
     def load_img(img_path):
@@ -40,27 +46,3 @@ class ImageDataset(Dataset):
 
 
 
-class LabNormalization():
-
-    def __init__(self):
-        self.l_channel_norm = 100
-        self.ab_channel_norm = 110
-
-    @staticmethod
-    def get_l_channel(x):
-        l_channel = x[:, :, 0].float()
-        l_channel = l_channel / 255.0
-        l_channel = l_channel.unsqueeze(0).unsqueeze(0)
-        return l_channel
-
-    @staticmethod
-    def get_ab_channel(x):
-        l_channel = x[:, :, 0].float()
-        l_channel = l_channel / 255.0
-        l_channel = l_channel.unsqueeze(0).unsqueeze(0)
-        return l_channel
-
-    @staticmethod
-    def get_lab(x):
-        lab_image = kornia.color.rgb_to_lab(x)
-        return lab_image
