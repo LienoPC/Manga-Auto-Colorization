@@ -26,16 +26,20 @@ def view_dataset_example(dataset):
 
 
 if __name__ == '__main__':
+
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(device)
     # Network creation
     module = ZhangColorizationNetwork()
-
+    module.to(device)
     summary(module, (1, 224, 224))
 
     # Create dataset
     training_set = ImageDataset("../TablesImages", resize=(224,224))
 
     # Batch size
-    batch_size = round(len(training_set) / 20)
+    batch_size = round(len(training_set) / 80)
     # Preparing indices for validation set
     indices = list(range(len(training_set)))
 
@@ -55,4 +59,4 @@ if __name__ == '__main__':
     num_epochs = 2
     optimizer = optim.Adam(parameters_to_optimize, lr=lr)
 
-    zhang_train(module, train_loader, valid_loader, device="cpu", optimizer=optimizer)
+    zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer)

@@ -32,9 +32,9 @@ class ImageDataset(Dataset):
         if self.resize:
             image = ZhangColorizationNetwork.res_image(image, self.resize)
         image = np.asarray(image).copy()  # Ensure the array is writable
-        l_original, l_resized = ZhangColorizationNetwork.preprocess_img(image)
+        _, l_resized = ZhangColorizationNetwork.preprocess_img(image)
         img_lab_orig = torch.Tensor(color.rgb2lab(image))[:, :, :].permute((2,0,1))
-        return l_original, l_resized, img_lab_orig
+        return l_resized, img_lab_orig
 
     @staticmethod
     def load_img(img_path):

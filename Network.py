@@ -198,7 +198,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
     for epoch in range(epochs):
         model.train()  # Set the model to training mode
         running_loss = 0.0
-        for l_original, l_resized, img_lab_orig in trainloader:
+        for l_resized, img_lab_orig in trainloader:
 
             # Get the LAB original image
             print(img_lab_orig.shape)
@@ -212,7 +212,6 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
             Z_ground = inverse_H_mapping(ab_groundtruth)
 
             Z_predicted, ab_output = model(l_resized) # Z_predicted
-            ZhangColorizationNetwork.postprocess_tens(l_original, ab_output)
             # Compute the custom loss over the Z space
             loss = multinomial_cross_entropy_loss_L(Z_predicted=Z_predicted, Z_ground_truth=Z_ground) # TO DEFINE
             loss.backward()
@@ -256,27 +255,42 @@ def gaussian_weight(distances, sigma):
     return torch.exp(-distances ** 2 / (2 * sigma ** 2))
 
 
-def inverse_H_mapping(ab_channels, sigma=5):
+def inverse_H_mapping(ab_channels, sigma=5, chunk_size=200):
+    """
+    GPU-based inverse H mapping using Gaussian-weighted 5-NN.
+    """
     B, C, H, W = ab_channels.shape  # Assuming shape is [Batch, 2, Height, Width]
-    print(f"Batch:{B}, Channels: {C}, Height: {H}, Width: {W}")
-    output = torch.zeros_like(ab_channels)
+    print(f"Batch: {B}, Channels: {C}, Height: {H}, Width: {W}")
 
-    ab_flat = ab_channels.permute(0, 2, 3, 1).reshape(-1, 2)  # [N, 2] where N = B*H*W
+    # Flatten spatial dimensions
+    ab_flat = ab_channels.view(B, C, -1).permute(0, 2, 1).reshape(-1, C)  # [N, 2]
+    N = ab_flat.shape[0]  # Total number of pixels across the batch
 
-    distances = torch.cdist(ab_flat.unsqueeze(0), ab_flat.unsqueeze(0), p=2).squeeze(0)  # [N, N]
+    # Initialize the output tensor
+    output_flat = torch.zeros_like(ab_flat, device=ab_channels.device)
 
-    knn_distances, knn_indices = torch.topk(distances, k=5, largest=False, dim=1)
+    # Process in chunks to save memory
+    for start in range(0, N, chunk_size):
+        end = min(start + chunk_size, N)
+        chunk = ab_flat[start:end]  # Current chunk [chunk_size, 2]
 
-    for i in range(knn_distances.shape[0]):
-        weights = gaussian_weight(knn_distances[i], sigma)  # Apply Gaussian weighting
-        neighbors = ab_flat[knn_indices[i]]  # Get the 5-nearest neighbors
-        weighted_sum = torch.sum(neighbors * weights.unsqueeze(1), dim=0)
+        # Compute distances between the chunk and all pixels
+        distances = torch.cdist(chunk, ab_flat, p=2)  # [chunk_size, N]
 
-        output_flat = weighted_sum / torch.sum(weights)  # Normalize weights
+        # Find 5 nearest neighbors for each pixel in the chunk
+        knn_distances, knn_indices = torch.topk(distances, k=5, largest=False, dim=1)  # [chunk_size, 5]
 
-    output = output_flat.view(B, H, W, C).permute(0, 3, 1, 2)
+        # Gather neighbors and compute weighted sums
+        neighbors = ab_flat[knn_indices]  # [chunk_size, 5, 2]
+        weights = gaussian_weight(knn_distances, sigma)  # [chunk_size, 5]
+        weighted_sum = torch.sum(neighbors * weights.unsqueeze(-1), dim=1)  # [chunk_size, 2]
+
+        # Normalize weights
+        output_flat[start:end] = weighted_sum / weights.sum(dim=1, keepdim=True)
+
+    # Reshape back to original shape
+    output = output_flat.view(B, H, W, C).permute(0, 3, 1, 2)  # [B, C, H, W]
     return output
-
 
 class LabNormalization():
 
