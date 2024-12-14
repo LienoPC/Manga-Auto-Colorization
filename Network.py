@@ -224,10 +224,10 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
             z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
 
             # Apply the model
-            z_predicted, ab_output = model(l_resized)
+            raw_conv8_output, ab_output = model(l_resized)
 
             # Compute the custom loss over the Z space
-            loss = multinomial_cross_entropy_loss_L(raw_network_output=z_predicted, z_ground_truth=z_ground)
+            loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
             loss.backward()
             optimizer.step()
 
@@ -252,9 +252,9 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
                 z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
 
                 # Apply the model
-                z_predicted_val, ab_output = model(l_resized_val)
+                raw_conv8_output_val, ab_output = model(l_resized_val)
 
-                loss = multinomial_cross_entropy_loss_L(raw_network_output=z_predicted_val, z_ground_truth=z_ground_val)
+                loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val, z_ground_truth=z_ground_val)
 
                 running_loss += loss.item()
 
