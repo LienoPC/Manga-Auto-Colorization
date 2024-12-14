@@ -18,7 +18,17 @@ class ImageDataset(Dataset):
         # Should be "empty"
         self.images = []
         for img_path in os.listdir(img_dir):
-            self.images.append(os.path.join(img_dir,img_path))
+            full_path = os.path.join(img_dir, img_path)
+
+            try:
+                # Try to lead the image and verify if it's RGB
+                with Image.open(full_path) as img:
+                    if img.mode == "RGB":
+                        self.images.append(full_path)
+            except Exception as e:
+                print(f"Errore nel caricamento dell'immagine {full_path}: {e}")
+
+
         ann_file = pd.DataFrame(self.images)
         ann_file.to_csv("Dataset/annotation.csv", header=False, index=False)
         self.images = pd.read_csv("Dataset/annotation.csv")
