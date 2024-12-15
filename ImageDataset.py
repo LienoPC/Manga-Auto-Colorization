@@ -5,6 +5,7 @@ from torchvision.io import read_image
 import numpy as np
 from PIL import Image
 import torch
+import matplotlib.pyplot as plt
 from skimage import color
 
 from Network import ZhangColorizationNetwork
@@ -17,6 +18,7 @@ class ImageDataset(Dataset):
         self.resize = resize
         # Should be "empty"
         self.images = []
+
         for img_path in os.listdir(img_dir):
             full_path = os.path.join(img_dir, img_path)
 
@@ -25,6 +27,7 @@ class ImageDataset(Dataset):
                 with Image.open(full_path) as img:
                     if img.mode == "RGB":
                         self.images.append(full_path)
+
             except Exception as e:
                 print(f"Errore nel caricamento dell'immagine {full_path}: {e}")
 
@@ -38,11 +41,14 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = self.images.iloc[idx,0]
-        image = self.load_img(str(img_path)) # Transform the image in tensor
+        image = self.load_img(str(img_path))  # Transform the image in a tensor
+
         if self.resize:
             image = ZhangColorizationNetwork.res_image(image, self.resize)
+
         image = np.asarray(image).copy()  # Ensure the array is writable
-        _, l_resized = ZhangColorizationNetwork.preprocess_img(image)
+        _, l_resized = ZhangColorizationNetwork.preprocess_img(image, new_size=self.resize)
+
         img_lab_orig = torch.Tensor(color.rgb2lab(image))[:, :, :].permute((2,0,1))
         return l_resized, img_lab_orig
 

@@ -7,6 +7,7 @@ from PIL import Image
 import torch.nn.functional as F
 from skimage.color import lab2rgb
 from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
 
 class ZhangColorizationNetwork(nn.Module):
     def __init__(self):
@@ -124,13 +125,12 @@ class ZhangColorizationNetwork(nn.Module):
 
     @staticmethod
     def res_image(image, new_size=(256, 256), resample=3):
-        image_pil = Image.fromarray(image)
-
         # Convert to RGB from RGBA if necessary
         if image.shape[-1] == 4:
-            image_pil = image_pil.convert('RGB')
+            image = color.rgba2rgb(image)
 
-        return np.asarray(image_pil.resize((new_size[1], new_size[0]), resample=resample))
+        image_rs = Image.fromarray(image.astype(np.uint8)).resize((new_size[1], new_size[0]), resample=resample)
+        return np.asarray(image_rs)
 
     @staticmethod
     def preprocess_img(img_rgb_orig, new_size=(256, 256), resample=3):
@@ -163,6 +163,7 @@ class ZhangColorizationNetwork(nn.Module):
 
         out_lab_orig = torch.cat((tens_orig_l, out_ab_orig), dim=1)
         return color.lab2rgb(out_lab_orig.data.cpu().numpy()[0, ...].transpose((1, 2, 0)))
+
 
     def point_estimate_H(self, Z_predicted):
         T = 1  # defines how the temperature of the image is re-adjusted (1 -> no changes)
@@ -198,14 +199,13 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
     train_losses = []
     valid_losses = []
 
-    print("Started training...")
     # Compute the quantized bins and move them to the correct device
     quantized_colorspace = quantized_bins().to(device)
 
+    print("Started training...")
     for epoch in range(epochs):
         model.train()  # Set the model to training mode
         running_loss = 0.0
-        running_loss_weighed = 0.0
         for l_resized, img_lab_orig in trainloader:
             # Get the LAB original image
             # print(f'Original lab image shape: {img_lab_orig.shape}')
@@ -306,6 +306,7 @@ def quantized_bins(grid_step=10, valid_range_a=(-110, 110), valid_range_b=(-110,
     Returns:
         torch.Tensor: A tensor containing the 313 quantized bins in the ab color space.
     """
+
     # Generate a grid for a and b with step size grid_step
     a_values = np.arange(valid_range_a[0], valid_range_a[1] + grid_step, grid_step)
     b_values = np.arange(valid_range_b[0], valid_range_b[1] + grid_step, grid_step)
