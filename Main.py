@@ -1,4 +1,5 @@
 import os
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,6 +7,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchsummary import summary
+from skimage import color
 
 from ImageDataset import ImageDataset
 from Network import ZhangColorizationNetwork, zhang_train
@@ -18,8 +20,19 @@ def view_dataset_example(dataset):
         plt.xticks([])
         plt.yticks([])
         plt.grid(False)
-        img = dataset[i]
-        plt.imshow(img.squeeze(), cmap=plt.cm.binary)
+        _, image = dataset[i]
+        image = image.permute(1, 2, 0).numpy()
+        image = color.lab2rgb(image)  # Convert from Lab to RGB
+        plt.imshow(image)
+    plt.show()
+
+
+def view_lab_image(image):
+    plt.figure()
+    image = torch.Tensor(image)
+    image = image.permute(1, 2, 0).numpy()
+    image = color.lab2rgb(image)  # Convert from Lab to RGB
+    plt.imshow(image)
     plt.show()
 
 
@@ -35,7 +48,7 @@ if __name__ == '__main__':
     summary(module, (1, 224, 224))
 
     # Create dataset
-    training_set = ImageDataset("../Dataset/500", resize=(224, 224))
+    training_set = ImageDataset("../Dataset", resize=(256, 256))
     print(f"Training set size: {len(training_set)}")
 
     # Batch size
@@ -55,7 +68,19 @@ if __name__ == '__main__':
     # Optimizer
     parameters_to_optimize = module.parameters()
     lr = 0.001
-    num_epochs = 2
+    num_epochs = 3
     optimizer = optim.Adam(parameters_to_optimize, lr=lr)
 
-    zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer)
+    l_orig, img = training_set[random.randint(0, 407)]
+    l_orig = l_orig.unsqueeze(0).to(device)
+    print(l_orig.shape)
+    print(img.shape)
+
+    zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, epochs=num_epochs)
+
+    conv8, ab_channel = module(l_orig)
+    rgb_img = ZhangColorizationNetwork.postprocess_tens(l_orig, ab_channel)
+
+    plt.figure()
+    plt.imshow(rgb_img)
+    plt.show()
