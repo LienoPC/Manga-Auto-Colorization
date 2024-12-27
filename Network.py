@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from skimage.color import lab2rgb
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+from ImageDataset import ImageNorm
 
 class ZhangColorizationNetwork(nn.Module):
     def __init__(self):
@@ -110,7 +111,7 @@ class ZhangColorizationNetwork(nn.Module):
             Starting from the L channel extracted from the colored image (during training) or from the L channel
             of the bw image, feed the network
         '''
-        conv1 = self.conv1(image)
+        conv1 = self.conv1(ImageNorm.normalize_l(image))
         conv2 = self.conv2(conv1)
         conv3 = self.conv3(conv2)
         conv4 = self.conv4(conv3)
@@ -119,50 +120,16 @@ class ZhangColorizationNetwork(nn.Module):
         conv7 = self.conv7(conv6)
         conv8 = self.conv8(conv7)
 
-        ab_channel = self.ab(conv8)
+        ab_channel = ImageNorm.unnormalize_ab(self.ab(conv8))
 
         return conv8, ab_channel
 
-    @staticmethod
-    def res_image(image, new_size=(256, 256), resample=3):
-        # Convert to RGB from RGBA if necessary
-        if image.shape[-1] == 4:
-            image = color.rgba2rgb(image)
+    def reset_weights(self):
+        for layer in self.children():
+            if hasattr(layer, 'reset_parameters'):
+                layer.reset_parameters()
 
-        image_rs = Image.fromarray(image.astype(np.uint8)).resize((new_size[1], new_size[0]), resample=resample)
-        return np.asarray(image_rs)
 
-    @staticmethod
-    def preprocess_img(img_rgb_orig, new_size=(256, 256), resample=3):
-
-        img_rgb_rs = ZhangColorizationNetwork.res_image(img_rgb_orig, new_size=new_size, resample=resample)
-
-        img_lab_orig = color.rgb2lab(img_rgb_orig)
-        img_lab_rs = color.rgb2lab(img_rgb_rs)
-
-        img_l_orig = img_lab_orig[:, :, 0]
-        img_l_rs = img_lab_rs[:, :, 0]
-
-        tens_orig_l = torch.Tensor(img_l_orig)[None, :, :]
-        tens_rs_l = torch.Tensor(img_l_rs)[None, :, :]
-        return tens_orig_l, tens_rs_l
-
-    @staticmethod
-    def postprocess_tens(tens_orig_l, out_ab):
-        # tens_orig_l 	1 x 1 x H_orig x W_orig
-        # out_ab 		1 x 2 x H x W
-
-        size_orig = tens_orig_l.shape[2:]
-        size = out_ab.shape[2:]
-
-        # call resize function if needed
-        if size_orig[0] != size[0] or size_orig[1] != size[1]:
-            out_ab_orig = F.interpolate(out_ab, size=size_orig, mode='bilinear')
-        else:
-            out_ab_orig = out_ab
-
-        out_lab_orig = torch.cat((tens_orig_l, out_ab_orig), dim=1)
-        return color.lab2rgb(out_lab_orig.data.cpu().numpy()[0, ...].transpose((1, 2, 0)))
 
 
     def point_estimate_H(self, Z_predicted):
@@ -176,6 +143,7 @@ class ZhangColorizationNetwork(nn.Module):
             den += torch.exp(torch.log(channel) / T)
 
         return torch.mean(num / den, dim=(0, 1))
+
 
 
 def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
@@ -194,30 +162,29 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
         valid_losses: A list of validation losses for each epoch.
       """
 
-    criterion = nn.CrossEntropyLoss()
-
-    train_losses = []
-    valid_losses = []
-
     # Compute the quantized bins and move them to the correct device
     quantized_colorspace = quantized_bins().to(device)
-
     print("Started training...")
+    train_losses = []
+    valid_losses = []
     for epoch in range(epochs):
+
         model.train()  # Set the model to training mode
         running_loss = 0.0
-        for l_resized, img_lab_orig in trainloader:
+        for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
             # Get the LAB original image
-            # print(f'Original lab image shape: {img_lab_orig.shape}')
-            # print(f'L resized shape: {l_resized.shape}')
-
+            print(l_resized.shape)
+            print("\n")
+            print(img_lab_orig.shape)
+            print("\n\n")
             optimizer.zero_grad()
-
             l_resized = l_resized.to(device)
             img_lab_orig = img_lab_orig.to(device)
 
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth = img_lab_orig[:, 1:3, :, :]
+            # Normalize the AB groundtruth
+            ab_groundtruth = ImageNorm.normalize_ab(ab_groundtruth)
 
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
             ab_groundtruth = resize_to_64x64(ab_groundtruth)
@@ -227,15 +194,26 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
             raw_conv8_output, ab_output = model(l_resized)
 
             # Compute the custom loss over the Z space
+            '''
+            print("\n\nZ Space printed:\n ")
+            print(f"Predicted Z: \n shape:")
+            print(raw_conv8_output.shape)
+            print("\n\n")
+            print(raw_conv8_output)
+            print(f"Ground Z: \n  shape:")
+            print(z_ground.shape)
+            print("\n\n")
+            print(z_ground)
+            '''
             loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
+            #print(f"Epoch [{epoch + 1}/{epochs}], Batch [{batch_idx + 1}/{len(trainloader)}], Loss: {loss.item()}")
 
-        train_loss = running_loss / len(trainloader)
-        train_losses.append(train_loss)
-
+        train_losses.append(running_loss)
+        train_loss = running_loss
         # Validation
         model.eval()  # Set the model to evaluation mode
         running_loss = 0.0
@@ -246,23 +224,129 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
 
                 # Extract the ground truth ab and convert it to tensor
                 ab_groundtruth_val = img_lab_orig_val[:, 1:3, :, :]
-
                 # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
                 ab_groundtruth_val = resize_to_64x64(ab_groundtruth_val)
                 z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
 
                 # Apply the model
                 raw_conv8_output_val, ab_output = model(l_resized_val)
-
                 loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val, z_ground_truth=z_ground_val)
 
                 running_loss += loss.item()
 
-        valid_loss = running_loss / len(validloader)
+        valid_loss = running_loss
         valid_losses.append(valid_loss)
-
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
 
+    return train_losses, valid_losses
+
+
+
+def zhang_train_progressed(model, trainloader, validloader, device, optimizer, epochs=2):
+    """
+      Trains a PyTorch model and returns the training and validation losses.
+
+      Args:
+        model: The PyTorch model to train.
+        trainloader: The DataLoader for the training set.
+        validloader: The DataLoader for the validation set.
+        epochs: The number of training epochs.
+        learning_rate: The learning rate for the optimizer.
+
+      Returns:
+        train_losses: A list of training losses for each epoch.
+        valid_losses: A list of validation losses for each epoch.
+      """
+
+    criterion = nn.CrossEntropyLoss()
+
+    learning_train_loss = []
+    learning_valid_loss = []
+
+
+
+    # Compute the quantized bins and move them to the correct device
+    quantized_colorspace = quantized_bins().to(device)
+
+    print("Started training...")
+    for i in range(1,2):
+        # Subdivide dataset in order to plot the learning curve
+        train_sub = torch.utils.data.Subset(trainloader.dataset, range(0, i*300))
+        valid_sub = torch.utils.data.Subset(validloader.dataset, range(0, i*80))
+
+        train_sub_loader = torch.utils.data.DataLoader(train_sub, batch_size=trainloader.batch_size, shuffle=True)
+        valid_sub_loader = torch.utils.data.DataLoader(valid_sub, batch_size=validloader.batch_size, shuffle=True)
+        train_losses = []
+        valid_losses = []
+        for epoch in range(epochs):
+
+            model.train()  # Set the model to training mode
+            running_loss = 0.0
+            for l_resized, img_lab_orig in train_sub_loader:
+                # Get the LAB original image
+
+
+                optimizer.zero_grad()
+
+                l_resized = l_resized.to(device)
+                img_lab_orig = img_lab_orig.to(device)
+
+                # Extract the ground truth ab and convert it to tensor
+                ab_groundtruth = img_lab_orig[:, 1:3, :, :]
+
+                # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+                ab_groundtruth = resize_to_64x64(ab_groundtruth)
+
+                z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
+
+                # Apply the model
+                raw_conv8_output, ab_output = model(l_resized)
+
+                # Compute the custom loss over the Z space
+                loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
+                loss.backward()
+                optimizer.step()
+
+                running_loss += loss.item()
+
+            train_loss = running_loss
+            train_losses.append(train_loss)
+
+            # Validation
+            model.eval()  # Set the model to evaluation mode
+            running_loss = 0.0
+            with torch.no_grad():
+                for l_resized_val, img_lab_orig_val in valid_sub_loader:
+                    l_resized_val = l_resized_val.to(device)
+                    img_lab_orig_val = img_lab_orig_val.to(device)
+
+                    # Extract the ground truth ab and convert it to tensor
+                    ab_groundtruth_val = img_lab_orig_val[:, 1:3, :, :]
+
+                    # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+                    ab_groundtruth_val = resize_to_64x64(ab_groundtruth_val)
+                    z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
+
+                    # Apply the model
+                    raw_conv8_output_val, ab_output = model(l_resized_val)
+
+                    loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val, z_ground_truth=z_ground_val)
+
+                    running_loss += loss.item()
+
+            valid_loss = running_loss
+            valid_losses.append(valid_loss)
+            print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
+
+        learning_train_loss.append(train_losses.pop())
+        learning_valid_loss.append(valid_losses.pop())
+        model.reset_weights()
+        del(train_sub)
+        del(valid_sub)
+        del(train_sub_loader)
+        del(valid_sub_loader)
+
+    return learning_train_loss, learning_valid_loss
 
 # Custom loss function
 def multinomial_cross_entropy_loss_L(raw_network_output, z_ground_truth):
@@ -270,23 +354,21 @@ def multinomial_cross_entropy_loss_L(raw_network_output, z_ground_truth):
     z_predicted = torch.softmax(raw_network_output, dim=-1)
 
     # Masking to avoid getting a nan result from applying a log function to the z_predicted values
-    mask = z_predicted > 0
-    masked_log = torch.zeros_like(z_predicted, device=z_predicted.device)
-    masked_log[mask] = torch.log(z_predicted[mask])
+    #mask = z_predicted > 0
+    #masked_log = torch.zeros_like(z_predicted, device=z_predicted.device)
+    #masked_log[mask] = torch.log(z_predicted[mask])
 
+    eps = 1e-8
+    log_z_predicted = torch.log(z_predicted + eps)
     # print(f'Z_ground_truth shape: {Z_ground_truth.shape}')
     # print(f'Z_predicted shape: {Z_predicted.shape}')
 
-    # print()
-    # print('Z_predicted:')
-    # print(Z_predicted)
-    # print()
-    # print('Z_ground_truth')
-    # print(Z_ground_truth)
-    # print()
 
-    loss = -torch.sum(z_ground_truth * masked_log)
-    print(f'Loss: {loss}')
+
+    loss = -torch.sum(z_ground_truth * log_z_predicted)
+    # Normalize loss by the number of elements
+    #loss /= z_ground_truth.numel()
+    #print(f'Loss: {loss}')
 
     return loss
 
@@ -361,6 +443,13 @@ def inverse_h_mapping(ab_channels, quantized_colorspace_bins, sigma=5, chunk_siz
     B, C, H, W = ab_channels.shape
     assert C == 2, "Input ab_channels must have 2 channels (a, b)."
 
+    '''
+    print(f"###### INVERSE H MAPPING #####\nab_channels min: {ab_channels.min()}, max: {ab_channels.max()}")
+    print(f"quantized_colorspace_bins min: {quantized_colorspace_bins.min()}, max: {quantized_colorspace_bins.max()}")
+    print(f"Quantized colorspace bins shape: {quantized_colorspace_bins.shape}\n")
+    print(f"Quantized colorspace bins sample: {quantized_colorspace_bins[:5]}\n")
+    '''
+
     # Flatten spatial dimensions
     ab_flat = ab_channels.view(B, C, -1).permute(0, 2, 1).reshape(-1, C)  # [N, 2]
     N = ab_flat.shape[0]  # Total number of pixels
@@ -376,13 +465,15 @@ def inverse_h_mapping(ab_channels, quantized_colorspace_bins, sigma=5, chunk_siz
 
         # Calculate distances between the chunk and all the quantized bins
         distances = torch.cdist(chunk, quantized_colorspace_bins, p=2)  # [chunk_size, Q]
-
         # Find the k-nearest neighbors (KNN) for each pixel
         knn_distances, knn_indices = torch.topk(distances, k=k, largest=False, dim=1)  # [chunk_size, k]
 
+        # Debugging
+        #print(f"Chunk {start}:{end} distances: {distances.min()}, {distances.max()}")
+        #print(f"KNN distances: {knn_distances.min()}, {knn_distances.max()}\n")
+
         # Compute gaussian weights
         knn_weights = gaussian_weight(knn_distances, sigma)  # Gaussian kernel [chunk_size, k]
-
         # Normalize the weights to sum to 1
         normalized_knn_weights = knn_weights / knn_weights.sum(dim=1, keepdim=True)  # [chunk_size, k]
 
@@ -394,13 +485,24 @@ def inverse_h_mapping(ab_channels, quantized_colorspace_bins, sigma=5, chunk_siz
         # Assign the nearest bin (scalar ground truth).
         z_scalar_flat[start:end] = knn_indices[:, 0]  # Take the closest bin for scalar encoding
 
-        # Reshape the soft-encoded tensor back to [B, 313, H, W]
-        soft_encoded = soft_encoded_flat.view(B, H, W, -1).permute(0, 3, 1, 2)  # [B, 313, H, W]
-        z_scalar = z_scalar_flat.view(B, H, W)  # [B, H, W]
+    # Reshape the soft-encoded tensor back to [B, 313, H, W]
+    soft_encoded = soft_encoded_flat.view(B, H, W, -1).permute(0, 3, 1, 2)  # [B, 313, H, W]
+    z_scalar = z_scalar_flat.view(B, H, W)  # [B, H, W]
 
-        # print(f'soft_encoded shape: {soft_encoded.shape}')
+    '''
+    print(f"Non-zero entries in soft_encoded: {(soft_encoded > 0).sum().item()}\n")
+    print(f"Max value in soft_encoded: {soft_encoded.max()}\n\n")
+    bin_sums = soft_encoded.sum(dim=(0, 2, 3))  # Sum over batch, height, and width
+    print(f"Bin sums: {bin_sums}\n")
+    print(f"Non-zero bins: {(bin_sums > 0).sum().item()}\n")
+    print(f"Soft_encoded sum per pixel (should be ~1): {soft_encoded.sum(dim=1)}\n")
 
-        return soft_encoded, z_scalar
+    # print(f'soft_encoded shape: {soft_encoded.shape}')
+    print(f"Final soft_encoded sum: {soft_encoded.sum()}\n\n")
+    print(f"Final soft_encoded: {soft_encoded}\n\n")
+    '''
+
+    return soft_encoded, z_scalar
 
 
 def resize_to_64x64(image):
@@ -420,24 +522,3 @@ def resize_to_64x64(image):
     output = F.interpolate(image, size=(64, 64), mode='bilinear', align_corners=False)
 
     return output
-
-
-class LabNormalization:
-
-    def __init__(self):
-        self.l_channel_norm = 100
-        self.ab_channel_norm = 110
-
-    @staticmethod
-    def get_l_channel(x):
-        l_channel = x[:, :, 0].float()
-        l_channel = l_channel / 255.0
-        l_channel = l_channel.unsqueeze(0).unsqueeze(0)
-        return l_channel
-
-    @staticmethod
-    def get_ab_channel(x):
-        l_channel = x[:, :, 0].float()
-        l_channel = l_channel / 255.0
-        l_channel = l_channel.unsqueeze(0).unsqueeze(0)
-        return l_channel
