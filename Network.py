@@ -367,7 +367,7 @@ def multinomial_cross_entropy_loss_L(raw_network_output, z_ground_truth):
 
     loss = -torch.sum(z_ground_truth * log_z_predicted)
     # Normalize loss by the number of elements
-    #loss /= z_ground_truth.numel()
+    loss /= z_ground_truth.numel()
     #print(f'Loss: {loss}')
 
     return loss

@@ -81,6 +81,18 @@ class ImageNorm:
         return in_ab*110.0
 
     @staticmethod
+    def normalize_lab_batch(in_lab):
+        in_lab[:, 0, :, :] = ImageNorm.normalize_l(in_lab[:, 0, :, :])
+        in_lab[:, 1:, :, :] = ImageNorm.normalize_ab(in_lab[:, 1:, :, :])
+        return in_lab
+
+    @staticmethod
+    def unnormalize_lab_batch(in_lab):
+        in_lab[:, 0, :, :] = ImageNorm.unnormalize_l(in_lab[:, 0, :, :])
+        in_lab[:, 1:, :, :] = ImageNorm.unnormalize_ab(in_lab[:, 1:, :, :])
+        return in_lab
+
+    @staticmethod
     def res_image(image, new_size=(256, 256), resample=3):
         # Convert to RGB from RGBA if necessary
         if image.shape[-1] == 4:
