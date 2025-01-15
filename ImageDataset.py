@@ -40,10 +40,10 @@ class ImageDataset(Dataset):
         img_path = self.images.iloc[idx,0]
         image = self.load_img(str(img_path))  # Transform the image in a tensor
         if self.resize:
-            image = ImageNorm.res_image(image, self.resize)
+            image = ImageProcess.res_image(image, self.resize)
 
         image = np.asarray(image).copy()  # Ensure the array is writable
-        tens_img = ImageNorm.preprocess_img_alternative(image, new_size=self.resize)
+        tens_img = ImageProcess.preprocess_img_alternative(image, new_size=self.resize)
         img_lab_orig = tens_img
 
         if (self.transform):
@@ -62,35 +62,39 @@ class ImageDataset(Dataset):
         return out_np
 
 
-class ImageNorm:
+class LABNormalization:
+    def __init__(self, l_mean, l_std, ab_mean, ab_std):
+        self.l_mean = l_mean
+        self.l_std = l_std
+        self.ab_mean = ab_mean
+        self.ab_std = ab_std
 
-    @staticmethod
-    def normalize_l(in_l):
-        return (in_l-50.0)/ 100.0
+    def normalize_l(self, in_l):
+        return (in_l - self.l_mean) / self.l_std
 
-    @staticmethod
-    def unnormalize_l(in_l):
-        return in_l*100.0 + 50.0
+    def unnormalize_l(self, in_l):
+        return (in_l * self.l_std) + self.l_mean
 
-    @staticmethod
-    def normalize_ab(in_ab):
-        return in_ab/110.0
+    def normalize_ab(self, in_ab):
+        return (in_ab - self.ab_mean) / self.ab_std
 
-    @staticmethod
-    def unnormalize_ab(in_ab):
-        return in_ab*110.0
+    def unnormalize_ab(self, in_ab):
+        return (in_ab * self.ab_std) + self.ab_mean
 
-    @staticmethod
-    def normalize_lab_batch(in_lab):
-        in_lab[:, 0, :, :] = ImageNorm.normalize_l(in_lab[:, 0, :, :])
-        in_lab[:, 1:, :, :] = ImageNorm.normalize_ab(in_lab[:, 1:, :, :])
+    def normalize_lab_batch(self, in_lab):
+        in_lab[:, 0, :, :] = self.normalize_l(in_lab[:, 0, :, :])
+        in_lab[:, 1:, :, :] = self.normalize_ab(in_lab[:, 1:, :, :])
         return in_lab
 
-    @staticmethod
-    def unnormalize_lab_batch(in_lab):
-        in_lab[:, 0, :, :] = ImageNorm.unnormalize_l(in_lab[:, 0, :, :])
-        in_lab[:, 1:, :, :] = ImageNorm.unnormalize_ab(in_lab[:, 1:, :, :])
+    def unnormalize_lab_batch(self, in_lab):
+        in_lab[:, 0, :, :] = self.unnormalize_l(in_lab[:, 0, :, :])
+        in_lab[:, 1:, :, :] = self.unnormalize_ab(in_lab[:, 1:, :, :])
         return in_lab
+
+
+class ImageProcess:
+
+
 
     @staticmethod
     def res_image(image, new_size=(256, 256), resample=3):
@@ -104,7 +108,7 @@ class ImageNorm:
     @staticmethod
     def preprocess_img(img_rgb_orig, new_size=(256, 256), resample=3):
 
-        img_rgb_rs = ImageNorm.res_image(img_rgb_orig, new_size=new_size, resample=resample)
+        img_rgb_rs = ImageProcess.res_image(img_rgb_orig, new_size=new_size, resample=resample)
 
         img_lab_orig = color.rgb2lab(img_rgb_orig)
         img_lab_rs = color.rgb2lab(img_rgb_rs)
@@ -119,7 +123,7 @@ class ImageNorm:
     @staticmethod
     def preprocess_img_alternative(img_rgb_orig, new_size=(256, 256), resample=3):
 
-        img_rgb_rs = ImageNorm.res_image(img_rgb_orig, new_size=new_size, resample=resample)
+        img_rgb_rs = ImageProcess.res_image(img_rgb_orig, new_size=new_size, resample=resample)
         img_lab_rs = color.rgb2lab(img_rgb_rs)
 
         tens_res = torch.Tensor(img_lab_rs)[:, :, :].permute((2, 0, 1))

@@ -8,12 +8,12 @@ import torch.nn.functional as F
 from skimage.color import lab2rgb
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
-from ImageDataset import ImageNorm
+from ImageDataset import ImageProcess
 
 class ZhangColorizationNetwork(nn.Module):
-    def __init__(self):
+    def __init__(self, lab_normalization):
         super(ZhangColorizationNetwork, self).__init__()
-
+        self.lab_normalization = lab_normalization
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, padding=1, stride=1, bias=True),
             nn.ReLU(True),
@@ -111,7 +111,7 @@ class ZhangColorizationNetwork(nn.Module):
             Starting from the L channel extracted from the colored image (during training) or from the L channel
             of the bw image, feed the network
         '''
-        conv1 = self.conv1(ImageNorm.normalize_l(image))
+        conv1 = self.conv1(self.lab_normalization.normalize_l(image))
         conv2 = self.conv2(conv1)
         conv3 = self.conv3(conv2)
         conv4 = self.conv4(conv3)
@@ -120,7 +120,7 @@ class ZhangColorizationNetwork(nn.Module):
         conv7 = self.conv7(conv6)
         conv8 = self.conv8(conv7)
 
-        ab_channel = ImageNorm.unnormalize_ab(self.ab(conv8))
+        ab_channel = self.lab_normalization.unnormalize_ab(self.ab(conv8))
 
         return conv8, ab_channel
 
@@ -132,17 +132,7 @@ class ZhangColorizationNetwork(nn.Module):
 
 
 
-    def point_estimate_H(self, Z_predicted):
-        T = 1  # defines how the temperature of the image is re-adjusted (1 -> no changes)
 
-        # First compute fT(z)
-        num = torch.exp(torch.log(Z_predicted) / T)
-        den = 0
-        for q in range(Z_predicted.size(2)):
-            channel = Z_predicted[:, :, q]
-            den += torch.exp(torch.log(channel) / T)
-
-        return torch.mean(num / den, dim=(0, 1))
 
 
 
@@ -184,7 +174,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth = img_lab_orig[:, 1:3, :, :]
             # Normalize the AB groundtruth
-            ab_groundtruth = ImageNorm.normalize_ab(ab_groundtruth)
+            ab_groundtruth = ImageProcess.normalize_ab(ab_groundtruth)
 
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
             ab_groundtruth = resize_to_64x64(ab_groundtruth)
