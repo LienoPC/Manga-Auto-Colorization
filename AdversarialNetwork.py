@@ -30,23 +30,7 @@ def plot_batch_images(batch, lab_normalization, title="Batch Training Images", n
     plt.show()
 
 
-def point_estimate_H(AB_Predicted):
-    T = 1  # Temperature adjustment (1 -> no changes)
 
-    # Initialize numerator and denominator
-    num = torch.exp(torch.log(AB_Predicted) / T)
-    den = torch.zeros_like(AB_Predicted)
-
-    # Iterate over the third dimension (q_dim)
-    for q in range(AB_Predicted.size(2)):
-        channel = AB_Predicted[:, :, q]
-        den[:, :, q] = torch.exp(torch.log(channel) / T)
-
-    # Normalize num by den
-    normalized = num / den
-
-    # Compute mean over batch and channels
-    return torch.mean(normalized, dim=(0, 1))
 
 class Discriminator(nn.Module):
     
@@ -146,12 +130,12 @@ def adv_train(generator, discriminator, trainloader, validloader, device, gen_op
             disc_loss = disc_gen_loss + disc_ground_loss
             #print(f"Discriminator Real Prediction: {disc_ground.mean().item()}, Fake Prediction: {disc_gen.mean().item()}")
             # Check if the loss is above the threshold
-            if disc_loss.item() > DISCRIMINATOR_LOSS_THRESHOLD:
+            if disc_loss > DISCRIMINATOR_LOSS_THRESHOLD:
                 disc_ground_loss.backward()
                 disc_gen_loss.backward()  # Perform backpropagation only if the condition is met
                 disc_optimizer.step()  # Update the discriminator's parameters
             else:
-                print(f"Skipping discriminator update. Loss: {disc_loss.item():.4f}")
+                print(f"Skipping discriminator update. Loss: {disc_loss:.4f}")
 
 
             # 2. Train the Generator
@@ -186,7 +170,7 @@ def adv_train(generator, discriminator, trainloader, validloader, device, gen_op
             r_gen_loss += gen_loss
             r_disc_loss += disc_loss
 
-            #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
+            plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
 
             # Cleanup
             del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output

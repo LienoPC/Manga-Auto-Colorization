@@ -121,8 +121,8 @@ class ZhangColorizationNetwork(nn.Module):
         conv8 = self.conv8(conv7)
 
         ab_channel = self.lab_normalization.unnormalize_ab(self.ab(conv8))
-
-        return conv8, ab_channel
+        #ab_channel = self.lab_normalization.unnormalize_ab(point_estimate_H(ab_channel))
+        return conv8,ab_channel
 
     def reset_weights(self):
         for layer in self.children():
@@ -512,3 +512,20 @@ def resize_to_64x64(image):
     output = F.interpolate(image, size=(64, 64), mode='bilinear', align_corners=False)
 
     return output
+
+def point_estimate_H(AB_Predicted):
+    T = 1  # Temperature adjustment (1 -> no changes)
+
+    # Ensure input is strictly positive to avoid issues with log
+    if torch.any(AB_Predicted <= 0):
+        raise ValueError("Input tensor contains non-positive values, which are invalid for log.")
+
+    # Compute normalized tensor directly
+    num = torch.exp(torch.log(AB_Predicted) / T)  # Numerator
+    den = torch.sum(num, dim=1, keepdim=True)  # Denominator: Sum over the channel dimension
+
+    # Normalize num by den
+    normalized = num / den
+
+    # Compute mean over batch, width, and height dimensions
+    return normalized

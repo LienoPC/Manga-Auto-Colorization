@@ -229,8 +229,8 @@ if __name__ == '__main__':
     gen_parameters_to_optimize = module.parameters()
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.0002
-    lr_disc = 0.0002
-    num_epochs = 5
+    lr_disc = 0.00002
+    num_epochs = 8
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))
@@ -250,13 +250,7 @@ if __name__ == '__main__':
     file_gen.seek(0)
     file_disc.seek(0)
 
-    plt.ion()  # Enable interactive mode
     fig, ax = plt.subplots()
-
-    # Create two lines for generator and discriminator
-    line_gen, = ax.plot([], [], 'o-', label="Generator")
-    line_disc, = ax.plot([], [], 'x-', label="Discriminator")
-
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.legend()
@@ -270,8 +264,8 @@ if __name__ == '__main__':
         x_gen, y_gen = map(float, l_gen.strip().split(","))
         x_disc, y_disc = map(float, l_disc.strip().split(","))
 
-        print(f"x_gen, x_disc: {x_gen, x_disc}\n")
-        print(f"y_gen, y_disc: {y_gen, y_disc}\n")
+        #print(f"x_gen, x_disc: {x_gen, x_disc}\n")
+        #print(f"y_gen, y_disc: {y_gen, y_disc}\n")
 
         # Append new points to the arrays
         x_gen_values.append(x_gen)
@@ -279,17 +273,9 @@ if __name__ == '__main__':
         x_disc_values.append(x_disc)
         y_disc_values.append(y_disc)
 
-        # Update the plot
-        line_gen.set_xdata(x_gen_values)
-        line_gen.set_ydata(y_gen_values)
-        line_disc.set_xdata(x_disc_values)
-        line_disc.set_ydata(y_disc_values)
-
-        ax.relim()  # Recalculate limits
-        ax.autoscale_view()  # Rescale view to fit data
-        plt.pause(0.01)  # Pause to show the update
-
-    plt.ioff()  # Turn off interactive mode
+        # Create two lines for generator and discriminator
+    line_gen, = ax.plot(x_gen_values, y_gen_values, 'o-', label="Generator")
+    line_disc, = ax.plot(x_disc_values, y_disc_values, 'x-', label="Discriminator")
     plt.show()
     file_gen.close()
     file_disc.close()
