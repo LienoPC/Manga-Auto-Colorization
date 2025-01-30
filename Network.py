@@ -1,3 +1,5 @@
+import tempfile
+
 import torchvision
 import torch
 import torch.nn as nn
@@ -8,7 +10,29 @@ import torch.nn.functional as F
 from skimage.color import lab2rgb
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+from torchvision.utils import make_grid
+
 from ImageDataset import ImageProcess
+
+
+def plot_batch_images(batch, lab_normalization, title="Batch Training Images", nrow=8, figsize=(12, 12), normalize=True):
+    batch = lab_normalization.unnormalize_lab_batch(batch)
+    batch_rgb = []
+    for lab_img in batch:
+        rgb_img = color.lab2rgb(lab_img.permute(1, 2, 0))
+        batch_rgb.append(rgb_img)
+
+    batch_rgb = np.stack(batch_rgb)
+    batch_rgb_tensor = torch.tensor(batch_rgb).permute(0, 3, 1, 2)
+    grid = make_grid(batch_rgb_tensor, nrow=nrow, normalize=False, value_range=(0, 1))
+    np_grid = grid.permute(1, 2, 0).numpy()  # Rearrange for Matplotlib
+    # Plot the grid
+    plt.figure(figsize=figsize)
+    plt.imshow(np_grid)
+    plt.title(title, fontsize=16)
+    plt.axis('off')
+    plt.show()
+
 
 class ZhangColorizationNetwork(nn.Module):
     def __init__(self, lab_normalization):
@@ -130,13 +154,86 @@ class ZhangColorizationNetwork(nn.Module):
                 layer.reset_parameters()
 
 
+def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch):
+    model.train()  # Set the model to training mode
+    running_loss = 0.0
+    pixel_loss_criterion = nn.L1Loss()
+
+    for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
+        # Get the LAB original image
+        optimizer.zero_grad()
+        l_resized = l_resized.to(device)
+        img_lab_orig = img_lab_orig.to(device)
+
+        # Extract the ground truth ab and convert it to tensor
+        ab_groundtruth = img_lab_orig[:, 1:3, :, :]
+        # Normalize the AB groundtruth
+        ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
+
+        # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+        ab_groundtruth = resize_to_64x64(ab_groundtruth)
+        z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
+
+        # Apply the model
+        raw_conv8_output, ab_output = model(l_resized)
+        '''
+        print("\n\nZ Space printed:\n ")
+        print(f"Predicted Z: \n shape:")
+        print(raw_conv8_output.shape)
+        print("\n\n")
+        print(raw_conv8_output)
+        print(f"Ground Z: \n  shape:")
+        print(z_ground.shape)
+        print("\n\n")
+        print(z_ground)
+        '''
+        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+        # Compute the custom loss over the Z space
+        z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
+        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+        loss = z_loss + pixel_loss
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+        # plot_batch_images(gen_lab_out.detach().to("cpu"), model.lab_normalization)
+
+    train_loss = running_loss / len(trainloader)
+    temp_file.write(f"{epoch},{train_loss}\n")
+
+    return temp_file, train_loss
 
 
+def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch):
+    # Validation
+    model.eval()  # Set the model to evaluation mode
+    running_loss = 0.0
+    with torch.no_grad():
+        for l_resized_val, img_lab_orig_val in validloader:
+            l_resized_val = l_resized_val.to(device)
+            img_lab_orig_val = img_lab_orig_val.to(device)
 
+            # Extract the ground truth ab and convert it to tensor
+            ab_groundtruth_val = img_lab_orig_val[:, 1:3, :, :]
+            # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+            ab_groundtruth_val = resize_to_64x64(ab_groundtruth_val)
+            z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
 
+            # Apply the model
+            raw_conv8_output_val, ab_output = model(l_resized_val)
+            loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
+                                                    z_ground_truth=z_ground_val)
 
+            running_loss += loss.item()
 
-def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
+    valid_loss = running_loss / len(validloader)
+    temp_file.write(f"{epoch},{valid_loss}\n")
+
+    return temp_file, valid_loss
+
+def DEPRECATED_zhang_train(model, trainloader, validloader, device, optimizer, lab_normalization, epochs=2):
     """
       Trains a PyTorch model and returns the training and validation losses.
 
@@ -154,19 +251,16 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
 
     # Compute the quantized bins and move them to the correct device
     quantized_colorspace = quantized_bins().to(device)
+    pixel_loss_criterion = nn.BCELoss()
     print("Started training...")
-    train_losses = []
-    valid_losses = []
+    temp_file_train = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_valid = tempfile.NamedTemporaryFile(mode="w+")
     for epoch in range(epochs):
 
         model.train()  # Set the model to training mode
         running_loss = 0.0
         for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
             # Get the LAB original image
-            print(l_resized.shape)
-            print("\n")
-            print(img_lab_orig.shape)
-            print("\n\n")
             optimizer.zero_grad()
             l_resized = l_resized.to(device)
             img_lab_orig = img_lab_orig.to(device)
@@ -174,7 +268,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth = img_lab_orig[:, 1:3, :, :]
             # Normalize the AB groundtruth
-            ab_groundtruth = ImageProcess.normalize_ab(ab_groundtruth)
+            ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
 
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
             ab_groundtruth = resize_to_64x64(ab_groundtruth)
@@ -195,15 +289,23 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
             print("\n\n")
             print(z_ground)
             '''
-            loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
+            gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+            gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+            z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
+            pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+            loss = z_loss + pixel_loss
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
-            #print(f"Epoch [{epoch + 1}/{epochs}], Batch [{batch_idx + 1}/{len(trainloader)}], Loss: {loss.item()}")
+            print(f"Epoch [{epoch + 1}/{epochs}], Batch [{batch_idx + 1}/{round(len(trainloader)/trainloader.batch_size)}], Loss: {loss.item()}")
 
-        train_losses.append(running_loss)
-        train_loss = running_loss
+            #plot_batch_images(gen_lab_out.detach().to("cpu"), model.lab_normalization)
+
+
+        train_loss = running_loss/len(trainloader)
+        temp_file_train.write(f"{epoch},{train_loss}\n")
         # Validation
         model.eval()  # Set the model to evaluation mode
         running_loss = 0.0
@@ -224,11 +326,11 @@ def zhang_train(model, trainloader, validloader, device, optimizer, epochs=2):
 
                 running_loss += loss.item()
 
-        valid_loss = running_loss
-        valid_losses.append(valid_loss)
+        valid_loss = running_loss / len(validloader)
+        temp_file_train.write(f"{epoch},{valid_loss}\n")
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
 
-    return train_losses, valid_losses
+    return temp_file_train, temp_file_train
 
 
 
@@ -272,7 +374,7 @@ def zhang_train_progressed(model, trainloader, validloader, device, optimizer, e
 
             model.train()  # Set the model to training mode
             running_loss = 0.0
-            for l_resized, img_lab_orig in train_sub_loader:
+            for batch_idx, (l_resized, img_lab_orig) in train_sub_loader:
                 # Get the LAB original image
 
 
