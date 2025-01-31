@@ -1,0 +1,13 @@
+Weight initialization: yes
+Dataset: One Piece Tables - 5700 images
+Batch size: 8
+Epochs: 8
+Gen Optimizer: Adam, Lr=0.0002 Betas=(0.5, 0.999)
+Disc Optimizer: Adam, Lr=0.00002 Betas=(0.5, 0.999)
+
+DISCRIMINATOR_LOSS_THRESHOLD = 0.4
+PIXEL_FACTOR = 1.0
+Z_LOSS_FACTOR = 3.0
+
+adv_loss_criterion = nn.BCELoss()
+pixel_loss_criterion = nn.L1Loss()

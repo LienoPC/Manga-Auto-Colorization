@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from skimage import color
 import matplotlib.pyplot as plt
+from torch.autograd import Variable
 from torchvision.utils import make_grid
 import tempfile
 
@@ -36,11 +37,11 @@ class Discriminator(nn.Module):
     
     def __init__(self):
         super(Discriminator,self).__init__()
-        self.conv1 = nn.Sequential(nn.Conv2d(3, 64, kernel_size=4, stride=2), nn.BatchNorm2d(64), nn.LeakyReLU(0.1))
-        self.conv2 = nn.Sequential(nn.Conv2d(64, 128, kernel_size=4, stride=2), nn.BatchNorm2d(128), nn.LeakyReLU(0.1))
-        self.conv3 = nn.Sequential(nn.Conv2d(128, 256, kernel_size=4, stride=2), nn.BatchNorm2d(256), nn.LeakyReLU(0.1))
-        self.conv4 = nn.Sequential(nn.Conv2d(256, 512, kernel_size=4, stride=2), nn.BatchNorm2d(512), nn.LeakyReLU(0.1))
-        self.conv5 = nn.Sequential(nn.Conv2d(512, 512, kernel_size=14, stride=1, padding=0), nn.LeakyReLU(0.1))
+        self.conv1 = nn.Sequential(nn.Conv2d(3, 64, kernel_size=4, stride=2), nn.BatchNorm2d(64), nn.LeakyReLU(0.2))
+        self.conv2 = nn.Sequential(nn.Conv2d(64, 128, kernel_size=4, stride=2), nn.BatchNorm2d(128), nn.LeakyReLU(0.2))
+        self.conv3 = nn.Sequential(nn.Conv2d(128, 256, kernel_size=4, stride=2), nn.BatchNorm2d(256), nn.LeakyReLU(0.2))
+        self.conv4 = nn.Sequential(nn.Conv2d(256, 512, kernel_size=4, stride=2), nn.BatchNorm2d(512), nn.LeakyReLU(0.2))
+        self.conv5 = nn.Sequential(nn.Conv2d(512, 512, kernel_size=14, stride=1, padding=0), nn.LeakyReLU(0.2))
         self.conv6 = nn.Sequential(nn.Conv2d(512, 1, kernel_size=1, stride=1, padding=0), nn.Sigmoid())
 
     def forward(self, x):
@@ -56,22 +57,23 @@ class Discriminator(nn.Module):
 
 def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_generator, temp_file_discriminator, quantized_colorspace, epoch):
 
-    DISCRIMINATOR_LOSS_THRESHOLD = 1.0
-    PIXEL_FACTOR = 2.0
+    DISCRIMINATOR_LOSS_THRESHOLD = 0.4
+    PIXEL_FACTOR = 1.0
     Z_LOSS_FACTOR = 3.0
-    # Compute the quantized bins and move them to the correct device
-    adv_loss_criterion = nn.BCELoss()
-    pixel_loss_criterion = nn.MSELoss()
 
     # Set the model to training mode
     generator.train()
     discriminator.train()
     r_gen_loss = 0.0
     r_disc_loss = 0.0
+    #Define loss criterion
+    adv_loss_criterion = nn.BCELoss()
+    pixel_loss_criterion = nn.MSELoss()
+
     for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
         # Define tensor used for adversarial loss
-        target_truth = torch.ones(l_resized.shape[0], 1)
-        target_false = torch.zeros(l_resized.shape[0], 1)
+        target_truth = Variable(torch.ones(l_resized.shape[0], 1), requires_grad=False)
+        target_false = Variable(torch.zeros(l_resized.shape[0], 1), requires_grad=False)
 
         target_truth = target_truth.to(device)
         target_false = target_false.to(device)
@@ -91,10 +93,6 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
 
         # 1. Train the Discriminator
         disc_optimizer.zero_grad()
-        for param in generator.parameters():
-            param.requires_grad = False
-        for param in discriminator.parameters():
-            param.requires_grad = True
 
         with torch.no_grad():
             raw_conv8_output, ab_output = generator(l_resized)
@@ -112,17 +110,12 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
         #print(f"Discriminator Real Prediction: {disc_ground.mean().item()}, Fake Prediction: {disc_gen.mean().item()}")
         # Check if the loss is above the threshold
         if disc_loss > DISCRIMINATOR_LOSS_THRESHOLD:
-            disc_ground_loss.backward()
-            disc_gen_loss.backward()  # Perform backpropagation only if the condition is met
+            disc_loss.backward()
             disc_optimizer.step()  # Update the discriminator's parameters
 
 
         # 2. Train the Generator
         gen_optimizer.zero_grad()
-        for param in generator.parameters():
-            param.requires_grad = True
-        for param in discriminator.parameters():
-            param.requires_grad = False
 
         raw_conv8_output, ab_output = generator(l_resized)
         gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
@@ -152,7 +145,7 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
         #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
 
         # Cleanup
-        del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output
+        del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output, target_truth, target_false
         torch.cuda.empty_cache()  # Clear CUDA cache explicitly
 
     gen_train_loss = r_gen_loss / len(trainloader)
@@ -179,8 +172,9 @@ def adv_valid_step(generator, discriminator, validloader, device, gen_optimizer,
 
     with torch.no_grad():
         for l_resized_val, img_lab_orig_val in validloader:
-            target_truth = torch.ones(l_resized_val.shape[0], 1)
-            target_false = torch.zeros(l_resized_val.shape[0], 1)
+            target_truth = Variable(torch.ones(l_resized_val.shape[0], 1), requires_grad=False)
+            target_false = Variable(torch.zeros(l_resized_val.shape[0], 1), requires_grad=False)
+
             target_truth = target_truth.to(device)
             target_false = target_false.to(device)
 
@@ -223,7 +217,7 @@ def adv_valid_step(generator, discriminator, validloader, device, gen_optimizer,
             r_gen_loss += gen_loss
             r_disc_loss += disc_loss
             # Cleanup
-            del l_resized_val, img_lab_orig_val, ab_groundtruth, z_ground, raw_conv8_output, ab_output
+            del l_resized_val, img_lab_orig_val, ab_groundtruth, z_ground, raw_conv8_output, ab_output, target_truth, target_false
             torch.cuda.empty_cache()
 
     gen_valid_loss = r_gen_loss / len(validloader)
@@ -231,7 +225,7 @@ def adv_valid_step(generator, discriminator, validloader, device, gen_optimizer,
     temp_file_generator.write(f"{epoch},{gen_valid_loss}\n")
     temp_file_discriminator.write(f"{epoch},{disc_valid_loss}\n")
     #print(f"Epoch [{epoch + 1}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
-    # del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss
+    #del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss
 
     return temp_file_generator, temp_file_discriminator, gen_valid_loss, disc_valid_loss
 

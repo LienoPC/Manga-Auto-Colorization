@@ -207,7 +207,6 @@ def store_trained_model(model, list_err_file, model_name):
         err_file.seek(0)
         output_file = open(f"./SavedModels/{model_name}/{name}.txt", "w")
         for line in err_file:
-            print(f"Printed line:{line}")
             output_file.write(line)
 
         #os.remove(err_file)

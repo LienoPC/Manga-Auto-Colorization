@@ -68,7 +68,7 @@ def zhang_model_main():
     # Optimizer
     parameters_to_optimize = module.parameters()
     lr = 0.001
-    num_epochs = 5
+    num_epochs = 8
 
 
     optimizer = optim.Adam(parameters_to_optimize, lr=lr)
@@ -93,6 +93,7 @@ def zhang_model_main():
     plt.figure()
     plt.imshow(rgb_img_out)
     plt.show()
+    store_trained_model(module, [("GenTrain",train_loss_file), ("DiscTrain",valid_loss_file)], "ZHANG")
 
 
 
@@ -223,10 +224,10 @@ def adv_patch_model_main():
     dataset = ImageDataset("../Dataset", resize=(256, 256))
     print(f"Training set size: {len(dataset)}")
 
-    data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
+    data_loader = torch.utils.data.DataLoader(dataset, shuffle=True)
 
     # Batch size
-    batch_size = 16
+    batch_size = 8
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
@@ -249,7 +250,7 @@ def adv_patch_model_main():
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.0002
     lr_disc = 0.00002
-    num_epochs = 3
+    num_epochs = 8
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))

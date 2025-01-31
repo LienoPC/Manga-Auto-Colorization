@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b1535ae2-9acc-4b25-8efd-22125aa05983" name="Changes" comment="Refactored code and added functions to save the trained model and related stats">
+      <change beforePath="$PROJECT_DIR$/AdversarialNetwork.py" beforeDir="false" afterPath="$PROJECT_DIR$/AdversarialNetwork.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/Main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/P2PDiscriminator.py" beforeDir="false" afterPath="$PROJECT_DIR$/P2PDiscriminator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Utility.py" beforeDir="false" afterPath="$PROJECT_DIR$/Utility.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="2pfUyXK9dTaTgMe5TEwKj0zchDJ" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.AdversarialNetwork.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DatasetDownload.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Network.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/Prova/Desktop/Utiversinà/Insegnamento macchinale/Andida/Manga-Auto-Colorization&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;PyScientificConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-d68999036c7f-b11f5e8da5ad-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-233.14475.56" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="b1535ae2-9acc-4b25-8efd-22125aa05983" name="Changes" comment="" />
+      <created>1733156877367</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1733156877367</updated>
+      <workItem from="1733156878612" duration="671000" />
+      <workItem from="1733308339855" duration="107000" />
+      <workItem from="1733308490127" duration="926000" />
+      <workItem from="1733393004277" duration="2631000" />
+      <workItem from="1733411982132" duration="6042000" />
+      <workItem from="1733566086148" duration="5989000" />
+      <workItem from="1733583611499" duration="1819000" />
+      <workItem from="1733757493723" duration="9615000" />
+      <workItem from="1734103278312" duration="547000" />
+      <workItem from="1734252959280" duration="715000" />
+      <workItem from="1734605712691" duration="31000" />
+      <workItem from="1734607401926" duration="1410000" />
+      <workItem from="1734628714262" duration="2573000" />
+      <workItem from="1734690379284" duration="4402000" />
+      <workItem from="1734707404332" duration="2418000" />
+      <workItem from="1734774975934" duration="5255000" />
+      <workItem from="1734858418549" duration="5935000" />
+      <workItem from="1734947967948" duration="7029000" />
+      <workItem from="1734975746336" duration="989000" />
+      <workItem from="1734977420171" duration="4013000" />
+      <workItem from="1735032193814" duration="9462000" />
+      <workItem from="1735205997626" duration="2275000" />
+      <workItem from="1735299023772" duration="1775000" />
+      <workItem from="1735380619803" duration="8546000" />
+      <workItem from="1735469442844" duration="2469000" />
+      <workItem from="1735555426146" duration="15834000" />
+      <workItem from="1735638102642" duration="7348000" />
+      <workItem from="1735645713427" duration="6450000" />
+      <workItem from="1735726393001" duration="8063000" />
+      <workItem from="1735813450213" duration="4244000" />
+      <workItem from="1735917787158" duration="3437000" />
+      <workItem from="1735925909906" duration="4243000" />
+      <workItem from="1735990354798" duration="2232000" />
+      <workItem from="1736005776414" duration="611000" />
+      <workItem from="1736071414291" duration="4824000" />
+      <workItem from="1736245426355" duration="7309000" />
+      <workItem from="1736331648113" duration="4253000" />
+      <workItem from="1736591232760" duration="5815000" />
+      <workItem from="1736763191533" duration="5627000" />
+      <workItem from="1736785070401" duration="4138000" />
+      <workItem from="1736874899105" duration="2249000" />
+      <workItem from="1736935849123" duration="5757000" />
+      <workItem from="1736961650154" duration="80000" />
+      <workItem from="1736965489113" duration="1376000" />
+      <workItem from="1737024999905" duration="2581000" />
+      <workItem from="1737107708606" duration="4155000" />
+      <workItem from="1737388886527" duration="4264000" />
+      <workItem from="1737539928868" duration="2343000" />
+      <workItem from="1737800034725" duration="6049000" />
+      <workItem from="1737885969362" duration="4226000" />
+      <workItem from="1737902672088" duration="2722000" />
+      <workItem from="1737914227222" duration="605000" />
+      <workItem from="1737971290071" duration="6411000" />
+      <workItem from="1738057327066" duration="1322000" />
+      <workItem from="1738145182793" duration="670000" />
+      <workItem from="1738163269077" duration="6040000" />
+      <workItem from="1738225544482" duration="11590000" />
+      <workItem from="1738248313113" duration="4524000" />
+      <workItem from="1738312536931" duration="5089000" />
+      <workItem from="1738322191194" duration="2228000" />
+      <workItem from="1738333859159" duration="4776000" />
+      <workItem from="1738339438002" duration="1065000" />
+    </task>
+    <task id="LOCAL-00001" summary="Added H and inverse H function">
+      <option name="closed" value="true" />
+      <created>1733156941308</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1733156941308</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Corrected image shape and tensor management">
+      <option name="closed" value="true" />
+      <created>1733569884316</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1733569884316</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Corrected training loop">
+      <option name="closed" value="true" />
+      <created>1734103306052</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1734103306052</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Change to gitignore">
+      <option name="closed" value="true" />
+      <created>1734253065994</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1734253065994</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Corrected dataset and loss errors">
+      <option name="closed" value="true" />
+      <created>1735299110468</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1735299110468</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Added adversarial loss and discriminator network">
+      <option name="closed" value="true" />
+      <created>1735920854419</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1735920854419</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Corrected adversarial model, added pixel loss and other minor changes">
+      <option name="closed" value="true" />
+      <created>1736961713598</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1736961713598</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Added code for loss plotting after training">
+      <option name="closed" value="true" />
+      <created>1737391864641</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1737391864641</updated>
+    </task>
+    <task id="LOCAL-00009" summary="Added PatchGAN discriminator and new adversarial train function">
+      <option name="closed" value="true" />
+      <created>1737974387226</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1737974387226</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Refactored code and added functions to save the trained model and related stats">
+      <option name="closed" value="true" />
+      <created>1738242287451</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1738242287451</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Added H and inverse H function" />
+    <MESSAGE value="Corrected image shape and tensor management" />
+    <MESSAGE value="Corrected training loop" />
+    <MESSAGE value="Change to gitignore" />
+    <MESSAGE value="Corrected dataset and loss errors" />
+    <MESSAGE value="Added adversarial loss and discriminator network" />
+    <MESSAGE value="Corrected adversarial model, added pixel loss and other minor changes" />
+    <MESSAGE value="Added code for loss plotting after training" />
+    <MESSAGE value="Added PatchGAN discriminator and new adversarial train function" />
+    <MESSAGE value="Refactored code and added functions to save the trained model and related stats" />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactored code and added functions to save the trained model and related stats" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/Manga_Auto_Colorization$DatasetDownload.coverage" NAME="DatasetDownload Coverage Results" MODIFIED="1736072454326" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Manga_Auto_Colorization$Network.coverage" NAME="Network Coverage Results" MODIFIED="1736591581248" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Manga_Auto_Colorization$AdversarialNetwork.coverage" NAME="AdversarialNetwork Coverage Results" MODIFIED="1736764247924" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Manga_Auto_Colorization$Main.coverage" NAME="Main Coverage Results" MODIFIED="1738339605046" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+</project>

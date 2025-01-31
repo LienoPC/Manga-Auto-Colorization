@@ -100,6 +100,31 @@ def adv_patch_train_step(generator, discriminator, trainloader, device, gen_opti
         res_ab_groundtruth = resize_to_64x64(ab_groundtruth)
         z_ground, _ = inverse_h_mapping(res_ab_groundtruth, quantized_colorspace)
 
+        # 2. Train the Generator
+        gen_optimizer.zero_grad()
+
+        raw_conv8_output, ab_output = generator(l_resized)
+        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+        # Discriminator output for generated images
+        with torch.no_grad():
+            disc_gen = discriminator(l_resized, gen_lab_out)
+        '''
+        print("Generator output (ab_output):", ab_output.mean().item(), ab_output.std().item())
+        print("Discriminator output (ground):", disc_ground.mean().item(), disc_ground.std().item())
+        print("Discriminator output (generated):", disc_gen.mean().item(), disc_gen.std().item())
+        '''
+        # Generator loss combines adversarial loss, the Z-space loss and the pixel loss
+        adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
+        z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
+        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+        # print(f"#### Generator Loss Components ####\n-Adv Loss = {adv_loss}\n-Z_Loss = {z_loss}\n-Pixel Loss = {pixel_loss}\n\n")
+        gen_loss = adv_loss + PIXEL_FACTOR * pixel_loss + Z_LOSS_FACTOR*z_loss
+
+        gen_loss.backward()
+        gen_optimizer.step()
+
         # 1. Train the Discriminator
         disc_optimizer.zero_grad()
 
@@ -121,34 +146,8 @@ def adv_patch_train_step(generator, discriminator, trainloader, device, gen_opti
         if disc_loss > DISCRIMINATOR_LOSS_THRESHOLD:
             disc_loss.backward()
             disc_optimizer.step()  # Update the discriminator's parameters
-        else:
-            print(f"Skipping discriminator update. Loss: {disc_loss:.4f}")
 
 
-        # 2. Train the Generator
-        gen_optimizer.zero_grad()
-
-        raw_conv8_output, ab_output = generator(l_resized)
-        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
-        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
-        # Discriminator output for generated images
-        with torch.no_grad():
-            disc_gen = discriminator(l_resized, gen_lab_out)
-        '''
-        print("Generator output (ab_output):", ab_output.mean().item(), ab_output.std().item())
-        print("Discriminator output (ground):", disc_ground.mean().item(), disc_ground.std().item())
-        print("Discriminator output (generated):", disc_gen.mean().item(), disc_gen.std().item())
-        '''
-        # Generator loss combines adversarial loss, the Z-space loss and the pixel loss
-        adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
-        z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
-        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
-
-        #print(f"#### Generator Loss Components ####\n-Adv Loss = {adv_loss}\n-Z_Loss = {z_loss}\n-Pixel Loss = {pixel_loss}\n\n")
-        gen_loss = adv_loss + PIXEL_FACTOR*pixel_loss
-
-        gen_loss.backward()
-        gen_optimizer.step()
 
         r_gen_loss += gen_loss
         r_disc_loss += disc_loss
@@ -196,8 +195,6 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
             img_lab_orig_val = img_lab_orig_val.to(device)
             img_lab_orig_val = lab_normalization.normalize_lab_batch(img_lab_orig_val)
 
-            img_bw = get_bw_LAB(img_lab_orig_val)
-
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth = img_lab_orig_val[:, 1:3, :, :]
             # Normalize the AB groundtruth
@@ -230,7 +227,7 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
             pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig_val)
 
             gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
-            plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
+            #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
 
             r_gen_loss += gen_loss
             r_disc_loss += disc_loss
