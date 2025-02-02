@@ -55,6 +55,8 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
 
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
+        store_trained_model(generator, [temp_file_train_g, temp_file_valid_g], "ADV_P_Generator")
+        store_trained_model(discriminator, [temp_file_train_d, temp_file_valid_d], "ADV_P_Discriminator")
 
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
@@ -95,6 +97,8 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
         temp_file_valid_d.flush()
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
+        store_trained_model(generator, [temp_file_train_g, temp_file_valid_g], "ADV_B_Generator")
+        store_trained_model(discriminator, [temp_file_train_d, temp_file_valid_d], "ADV_B_Discriminator")
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
 
@@ -133,6 +137,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
 
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
         # del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss
+        store_trained_model(model, [temp_file_train, temp_file_valid], "ZHANG")
 
     return temp_file_train, temp_file_valid
 

@@ -122,8 +122,8 @@ def adv_base_model_main():
     discriminator.to(device)
 
     # If needed we can apply an initialization to the weights of the networks
-    # module.apply(init_weights_he)
-    # discriminator.apply(weights_init)
+    module.apply(init_weights_he)
+    discriminator.apply(weights_init)
 
     # l_mean: 73.07875061035156; l_std: 28.479511260986328; ab_mean: 3.4011828899383545; ab_std: 14.096550941467285
 
@@ -227,7 +227,7 @@ def adv_patch_model_main():
     data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
 
     # Batch size
-    batch_size = 32
+    batch_size = 64
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
@@ -250,7 +250,7 @@ def adv_patch_model_main():
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.002
     lr_disc = 0.0002
-    num_epochs = 8
+    num_epochs = 6
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.9))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.9))
@@ -287,4 +287,5 @@ def adv_patch_model_main():
 #torch.backends.cudnn.benchmark = False
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
+
 adv_patch_model_main()
