@@ -153,6 +153,7 @@ def adv_patch_train_step(generator, discriminator, trainloader, device, gen_opti
         r_disc_loss += disc_loss
 
         #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
+        print(f"Batch {batch_idx}/{len(trainloader)}")
 
         # Cleanup
         del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output

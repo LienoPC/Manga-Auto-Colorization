@@ -47,11 +47,15 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
     for epoch in range(epochs):
 
         temp_file_train_g, temp_file_train_d, gen_train_loss, disc_train_loss = adv_patch_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_train_g, temp_file_train_d, quantized_colorspace, img_dim, epoch)
-
+        temp_file_train_g.flush()
+        temp_file_train_d.flush()
         temp_file_valid_g, temp_file_valid_d, gen_valid_loss, disc_valid_loss = adv_patch_valid_step(generator, discriminator, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_valid_g, temp_file_valid_d, quantized_colorspace, img_dim, epoch)
+        temp_file_valid_g.flush()
+        temp_file_valid_d.flush()
 
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
+
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
 
@@ -76,18 +80,19 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
     quantized_colorspace = quantized_bins().to(device)
     print("Started training...")
 
-    temp_file_train_g = tempfile.NamedTemporaryFile(mode="w+")
-    temp_file_train_d = tempfile.NamedTemporaryFile(mode="w+")
-
-    temp_file_valid_g = tempfile.NamedTemporaryFile(mode="w+")
-    temp_file_valid_d = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_train_g = open(f"./SavedModels/ADV_B/GenTrain.txt", "w")
+    temp_file_train_d = open(f"./SavedModels/ADV_B/DiscTrain.txt", "w")
+    temp_file_valid_g = open(f"./SavedModels/ADV_B/GenValid.txt", "w")
+    temp_file_valid_d = open(f"./SavedModels/ADV_B/DiscValid.txt", "w")
 
     for epoch in range(epochs):
 
         temp_file_train_g, temp_file_train_d, gen_train_loss, disc_train_loss = adv_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_train_g, temp_file_train_d, quantized_colorspace, epoch)
-
+        temp_file_train_g.flush()
+        temp_file_train_d.flush()
         temp_file_valid_g, temp_file_valid_d, gen_valid_loss, disc_valid_loss = adv_valid_step(generator, discriminator, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_valid_g, temp_file_valid_d, quantized_colorspace, epoch)
-
+        temp_file_valid_g.flush()
+        temp_file_valid_d.flush()
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
 

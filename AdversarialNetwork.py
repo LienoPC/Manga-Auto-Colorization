@@ -71,10 +71,11 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
     pixel_loss_criterion = nn.MSELoss()
 
     for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
+
+
         # Define tensor used for adversarial loss
         target_truth = Variable(torch.ones(l_resized.shape[0], 1), requires_grad=False)
         target_false = Variable(torch.zeros(l_resized.shape[0], 1), requires_grad=False)
-
         target_truth = target_truth.to(device)
         target_false = target_false.to(device)
 
@@ -90,6 +91,32 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
         # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
         res_ab_groundtruth = resize_to_64x64(ab_groundtruth)
         z_ground, _ = inverse_h_mapping(res_ab_groundtruth, quantized_colorspace)
+
+        # 2. Train the Generator
+        gen_optimizer.zero_grad()
+
+        raw_conv8_output, ab_output = generator(l_resized)
+        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+        # Discriminator output for generated images
+        with torch.no_grad():
+            disc_gen = discriminator(gen_lab_out)
+        '''
+        print("Generator output (ab_output):", ab_output.mean().item(), ab_output.std().item())
+        print("Discriminator output (ground):", disc_ground.mean().item(), disc_ground.std().item())
+        print("Discriminator output (generated):", disc_gen.mean().item(), disc_gen.std().item())
+        '''
+        # Generator loss combines adversarial loss, the Z-space loss and the pixel loss
+        adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
+        z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
+        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+        # print(f"#### Generator Loss Components ####\n-Adv Loss = {adv_loss}\n-Z_Loss = {z_loss}\n-Pixel Loss = {pixel_loss}\n\n")
+        gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
+        #print(torch.cuda.memory_summary(device="cuda:0", abbreviated=False))
+
+        gen_loss.backward()
+        gen_optimizer.step()
 
         # 1. Train the Discriminator
         disc_optimizer.zero_grad()
@@ -114,36 +141,12 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
             disc_optimizer.step()  # Update the discriminator's parameters
 
 
-        # 2. Train the Generator
-        gen_optimizer.zero_grad()
-
-        raw_conv8_output, ab_output = generator(l_resized)
-        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
-        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
-        # Discriminator output for generated images
-        with torch.no_grad():
-            disc_gen = discriminator(gen_lab_out)
-        '''
-        print("Generator output (ab_output):", ab_output.mean().item(), ab_output.std().item())
-        print("Discriminator output (ground):", disc_ground.mean().item(), disc_ground.std().item())
-        print("Discriminator output (generated):", disc_gen.mean().item(), disc_gen.std().item())
-        '''
-        # Generator loss combines adversarial loss, the Z-space loss and the pixel loss
-        adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
-        z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
-        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
-
-        #print(f"#### Generator Loss Components ####\n-Adv Loss = {adv_loss}\n-Z_Loss = {z_loss}\n-Pixel Loss = {pixel_loss}\n\n")
-        gen_loss = adv_loss + Z_LOSS_FACTOR*z_loss + PIXEL_FACTOR*pixel_loss
-
-        gen_loss.backward()
-        gen_optimizer.step()
 
         r_gen_loss += gen_loss
         r_disc_loss += disc_loss
 
         #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
-
+        print(f"Batch {batch_idx}/{len(trainloader)}")
         # Cleanup
         del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output, target_truth, target_false
         torch.cuda.empty_cache()  # Clear CUDA cache explicitly
@@ -347,7 +350,7 @@ def DEPRECATED_adv_train(generator, discriminator, trainloader, validloader, dev
             r_gen_loss += gen_loss
             r_disc_loss += disc_loss
 
-            plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
+            #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
 
             # Cleanup
             del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output

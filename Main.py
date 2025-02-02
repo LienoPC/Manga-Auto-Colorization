@@ -134,7 +134,7 @@ def adv_base_model_main():
     data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
 
     # Batch size
-    batch_size = 4
+    batch_size = 32
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
@@ -224,10 +224,10 @@ def adv_patch_model_main():
     dataset = ImageDataset("../Dataset", resize=(256, 256))
     print(f"Training set size: {len(dataset)}")
 
-    data_loader = torch.utils.data.DataLoader(dataset, shuffle=True)
+    data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
 
     # Batch size
-    batch_size = 8
+    batch_size = 32
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
@@ -248,12 +248,12 @@ def adv_patch_model_main():
     # Optimizer
     gen_parameters_to_optimize = module.parameters()
     disc_parameters_to_optimize = discriminator.parameters()
-    lr_gen = 0.0002
-    lr_disc = 0.00002
+    lr_gen = 0.002
+    lr_disc = 0.0002
     num_epochs = 8
 
-    gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
-    disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))
+    gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.9))
+    disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.9))
 
     # Extract a random image from the validation set to evaluate the model after the training
     l_orig, img = dataset[random.randint(split, len(dataset)-1)]
@@ -284,4 +284,7 @@ def adv_patch_model_main():
 
 
 
-adv_base_model_main()
+#torch.backends.cudnn.benchmark = False
+#torch.backends.cudnn.deterministic = True
+torch.cuda.empty_cache()
+adv_patch_model_main()

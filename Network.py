@@ -461,7 +461,7 @@ def multinomial_cross_entropy_loss_L(raw_network_output, z_ground_truth):
     # Normalize loss by the number of elements
     loss /= z_ground_truth.numel()
     #print(f'Loss: {loss}')
-
+    del log_z_predicted, z_predicted, eps
     return loss
 
 
@@ -506,7 +506,7 @@ def quantized_bins(grid_step=10, valid_range_a=(-110, 110), valid_range_b=(-110,
     quantized_bins = torch.tensor(valid_ab_values, dtype=torch.float32)
 
     # print(f'Quantized bins:\n{quantized_bins}')
-
+    del kmeans, in_gamut_mask, rgb_colors,lab_colors, ab_grid, a_values, b_values
     return quantized_bins
 
 
@@ -593,7 +593,7 @@ def inverse_h_mapping(ab_channels, quantized_colorspace_bins, sigma=5, chunk_siz
     print(f"Final soft_encoded sum: {soft_encoded.sum()}\n\n")
     print(f"Final soft_encoded: {soft_encoded}\n\n")
     '''
-
+    del z_scalar_flat, soft_encoded_flat, distances, knn_distances, knn_indices, knn_weights
     return soft_encoded, z_scalar
 
 
