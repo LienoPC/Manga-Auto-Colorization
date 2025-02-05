@@ -90,7 +90,7 @@ def zhang_model_main(checkpoint=False, epoch=0):
     print(f"Batch size: {train_loader.batch_size}")
 
     if(checkpoint):
-        checkpoint = torch.load(f'ZHANG_Epoch_{epoch}')
+        checkpoint = torch.load(f'./SavedModels/ZHANG_Epoch_{epoch}/checkpoint.pth', weights_only=True)
         module.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
@@ -194,11 +194,11 @@ def adv_base_model_main(checkpoint, epoch):
     plt.show()
 
     if(checkpoint):
-        checkpoint = torch.load(f'ADV_BASE_G_Epoch{epoch}')
+        checkpoint = torch.load(f'./SavedModels/ADV_BASE_G_Epoch{epoch}/checkpoint.pth', weights_only=True)
         module.load_state_dict(checkpoint['model_state_dict'])
         gen_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        checkpointd = torch.load(f'ADV_BASE_D_Epoch{epoch}')
+        checkpointd = torch.load(f'./SavedModels/ADV_BASE_D_Epoch{epoch}/checkpoint.pth', weights_only=True)
         discriminator.load_state_dict(checkpointd['model_state_dict'])
         disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
         epoch = checkpointd['epoch']
@@ -306,11 +306,11 @@ def adv_patch_model_main(checkpoint, epoch):
     plt.show()
 
     if (checkpoint):
-        checkpoint = torch.load(f'./SavedModels/ADV_PATCH_G_Epoch{epoch}/model.pth')
+        checkpoint = torch.load(f'./SavedModels/ADV_PATCH_G_Epoch{epoch}/checkpoint.pth', weights_only=True)
         module.load_state_dict(checkpoint['model_state_dict'])
         gen_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        checkpointd = torch.load(f'ADV_PATCH_D_Epoch{epoch}')
+        checkpointd = torch.load(f'./SavedModels/ADV_PATCH_D_Epoch{epoch}/checkpoint.pth', weights_only=True)
         discriminator.load_state_dict(checkpointd['model_state_dict'])
         disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
         epoch = checkpointd['epoch']
@@ -354,4 +354,4 @@ def adv_patch_model_main(checkpoint, epoch):
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_patch_model_main(True, 1)
+adv_patch_model_main(True, 0)

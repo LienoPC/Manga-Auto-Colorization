@@ -219,7 +219,7 @@ def store_trained_model(model, list_err_file, model_name, epoch, optimizer):
     os.makedirs(save_dir, exist_ok=True)
 
     torch.save({
-        'epoch': epoch,
+        'epoch': epoch+1,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
     }, f'{save_dir}/checkpoint.pth')
