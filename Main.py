@@ -354,4 +354,4 @@ def adv_patch_model_main(checkpoint, epoch):
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_patch_model_main(True, 0)
+adv_patch_model_main(True, 1)

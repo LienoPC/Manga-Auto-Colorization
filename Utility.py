@@ -53,7 +53,7 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
         temp_file_valid_g.flush()
         temp_file_valid_d.flush()
 
-        print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
+        print(f"Epoch [{epoch}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
         store_trained_model(generator,[("GenTrain", temp_file_train_g), ("GenValid", temp_file_valid_g)], f"ADV_PATCH_G_Epoch{epoch}",epoch=epoch, optimizer=gen_optimizer)
         store_trained_model(discriminator,
@@ -97,7 +97,7 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
         temp_file_valid_g, temp_file_valid_d, gen_valid_loss, disc_valid_loss = adv_valid_step(generator, discriminator, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_valid_g, temp_file_valid_d, quantized_colorspace, epoch)
         temp_file_valid_g.flush()
         temp_file_valid_d.flush()
-        print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
+        print(f"Epoch [{epoch}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
         store_trained_model(generator,
                             [("GenTrain", temp_file_train_g), ("DiscTrain", temp_file_train_d), ("GenValid", temp_file_valid_g),
@@ -141,7 +141,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
                                                               temp_file_valid,
                                                               quantized_colorspace, epoch, True)
 
-        print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
+        print(f"Epoch [{epoch}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
         # del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss
         store_trained_model(model, [("Train",temp_file_train), ("Valid",temp_file_valid)], f"ZHANG_Epoch_{epoch}", epoch=epoch, optimizer=optimizer)
 
@@ -219,7 +219,7 @@ def store_trained_model(model, list_err_file, model_name, epoch, optimizer):
     os.makedirs(save_dir, exist_ok=True)
 
     torch.save({
-        'epoch': epoch+1,
+        'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
     }, f'{save_dir}/checkpoint.pth')
