@@ -306,7 +306,7 @@ def adv_patch_model_main(checkpoint, epoch):
     plt.show()
 
     if (checkpoint):
-        checkpoint = torch.load(f'ADV_PATCH_G_Epoch{epoch}')
+        checkpoint = torch.load(f'./SavedModels/ADV_PATCH_G_Epoch{epoch}/model.pth')
         module.load_state_dict(checkpoint['model_state_dict'])
         gen_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
@@ -354,4 +354,4 @@ def adv_patch_model_main(checkpoint, epoch):
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_patch_model_main(False, 1)
+adv_patch_model_main(True, 1)

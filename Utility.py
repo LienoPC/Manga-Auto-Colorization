@@ -130,7 +130,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
     print("Started training...")
     temp_file_train = tempfile.NamedTemporaryFile(mode="w+")
     temp_file_valid = tempfile.NamedTemporaryFile(mode="w+")
-    for epoch in range(epoch-1,epochs):
+    for epoch in range(epoch,epochs):
         temp_file_train, train_loss = zhang_train_step(model, trainloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_train,
@@ -222,7 +222,7 @@ def store_trained_model(model, list_err_file, model_name, epoch, optimizer):
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-    }, 'checkpoint.pth')
+    }, f'{save_dir}/checkpoint.pth')
     for (name, err_file) in list_err_file:
         err_file.seek(0)
         output_file = open(f"./SavedModels/{model_name}/{name}.txt", "w")
