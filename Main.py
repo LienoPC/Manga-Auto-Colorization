@@ -18,10 +18,10 @@ from P2PDiscriminator import PatchGAN
 from Utility import init_weights_he, zhang_train, plot_loss, adv_base_train, weights_init, adv_patch_train, \
     store_trained_model
 
-
+checkpoint = True
 # Main that uses only the Zhang model without the adversarial loss
 
-def zhang_model_main():
+def zhang_model_main(checkpoint=False, epoch=0):
     # Avoid a memory leak caused by KMeans from scikit-learn when there are fewer chunks than available threads.
     os.environ['OMP_NUM_THREADS'] = '3'
 
@@ -44,26 +44,33 @@ def zhang_model_main():
     #transform = transforms.Normalize(mean, std, )
 
     # Create dataset
-    training_set = ImageDataset("../Dataset", resize=(256, 256))
-    print(f"Training set size: {len(training_set)}")
+    dataset = ImageDataset("../Dataset", resize=(256, 256))
+    print(f"Training set size: {len(dataset)}")
 
     # Batch size
     batch_size = 32
     #batch_size = len(training_set)
     # Preparing indices for validation set
-    indices = list(range(len(training_set)))
+    indices = list(range(len(dataset)))
 
     #mean, std = get_mean_std(loader)
 
+    # Set random seed for reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
-    # selected as get 20% of the train set
-    split = int(np.floor(0.8 * len(training_set)))
+    # Shuffle dataset indices
+    indices = np.arange(len(dataset))
+    np.random.shuffle(indices)
+
+    # Split dataset (80% train, 20% validation)
+    split = int(np.floor(0.8 * len(dataset)))
     train_sample = SubsetRandomSampler(indices[:split])
     valid_sample = SubsetRandomSampler(indices[split:])
-
     # Define the data loader
-    train_loader = torch.utils.data.DataLoader(training_set, sampler=train_sample, batch_size=batch_size, drop_last=False)
-    valid_loader = torch.utils.data.DataLoader(training_set, sampler=valid_sample, batch_size=batch_size, drop_last=False)
+    train_loader = torch.utils.data.DataLoader(dataset, sampler=train_sample, batch_size=batch_size, drop_last=False)
+    valid_loader = torch.utils.data.DataLoader(dataset, sampler=valid_sample, batch_size=batch_size, drop_last=False)
 
     # Optimizer
     parameters_to_optimize = module.parameters()
@@ -74,7 +81,7 @@ def zhang_model_main():
     optimizer = optim.Adam(parameters_to_optimize, lr=lr, betas=(0.5, 0.999))
 
 
-    l_orig, img = training_set[random.randint(0, split)]
+    l_orig, img = dataset[random.randint(0, split)]
 
     rgb_img = ImageProcess.postprocess_tens(l_orig, img[1:,:,:])
     plt.imshow(rgb_img)
@@ -82,7 +89,14 @@ def zhang_model_main():
 
     print(f"Batch size: {train_loader.batch_size}")
 
-    train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs)
+    if(checkpoint):
+        checkpoint = torch.load(f'ZHANG_Epoch_{epoch}')
+        module.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs, epoch=epoch)
+    else:
+        train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs)
 
     train_loss_file.seek(0)
     valid_loss_file.seek(0)
@@ -101,7 +115,7 @@ def zhang_model_main():
 
 
 
-def adv_base_model_main():
+def adv_base_model_main(checkpoint, epoch):
     # Avoid a memory leak caused by KMeans from scikit-learn when there are fewer chunks than available threads.
     os.environ['OMP_NUM_THREADS'] = '3'
 
@@ -141,7 +155,16 @@ def adv_base_model_main():
 
     # mean, std = get_mean_std(loader)
 
-    # Selected as get 20% of the train set
+    # Set random seed for reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    # Shuffle dataset indices
+    indices = np.arange(len(dataset))
+    np.random.shuffle(indices)
+
+    # Split dataset (80% train, 20% validation)
     split = int(np.floor(0.8 * len(dataset)))
     train_sample = SubsetRandomSampler(indices[:split])
     valid_sample = SubsetRandomSampler(indices[split:])
@@ -170,8 +193,20 @@ def adv_base_model_main():
     plt.imshow(rgb_img)
     plt.show()
 
-    # Train the model(s)
-    file_train_g, file_train_d, file_valid_g, file_valid_d = adv_base_train(module, discriminator, train_loader, valid_loader, img_dim=256, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs)
+    if(checkpoint):
+        checkpoint = torch.load(f'ADV_BASE_G_Epoch{epoch}')
+        module.load_state_dict(checkpoint['model_state_dict'])
+        gen_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        checkpointd = torch.load(f'ADV_BASE_D_Epoch{epoch}')
+        discriminator.load_state_dict(checkpointd['model_state_dict'])
+        disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
+        epoch = checkpointd['epoch']
+        file_train_g, file_train_d, file_valid_g, file_valid_d = adv_base_train(module, discriminator, train_loader, valid_loader, img_dim=256, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs, epoch=epoch)
+
+    else:
+        # Train the model(s)
+        file_train_g, file_train_d, file_valid_g, file_valid_d = adv_base_train(module, discriminator, train_loader, valid_loader, img_dim=256, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs, epoch=epoch)
 
     # Take the saved values of losses from the disk and plot them
     file_train_g.seek(0)
@@ -194,7 +229,7 @@ def adv_base_model_main():
 
 
 # ADV PATCH TRAINING
-def adv_patch_model_main():
+def adv_patch_model_main(checkpoint, epoch):
     # Avoid a memory leak caused by KMeans from scikit-learn when there are fewer chunks than available threads.
     os.environ['OMP_NUM_THREADS'] = '3'
 
@@ -225,14 +260,23 @@ def adv_patch_model_main():
     print(f"Training set size: {len(dataset)}")
 
     # Batch size
-    batch_size = 64
+    batch_size = 32
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
 
     # mean, std = get_mean_std(loader)
 
-    # Selected as get 20% of the train set
+    # Set random seed for reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    # Shuffle dataset indices
+    indices = np.arange(len(dataset))
+    np.random.shuffle(indices)
+
+    # Split dataset (80% train, 20% validation)
     split = int(np.floor(0.8 * len(dataset)))
     train_sample = SubsetRandomSampler(indices[:split])
     valid_sample = SubsetRandomSampler(indices[split:])
@@ -261,8 +305,32 @@ def adv_patch_model_main():
     plt.imshow(rgb_img)
     plt.show()
 
-    # Train the model(s)
-    file_train_g, file_train_d, file_valid_g, file_valid_d = adv_patch_train(module, discriminator, train_loader, valid_loader, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs, img_dim=256)
+    if (checkpoint):
+        checkpoint = torch.load(f'ADV_PATCH_G_Epoch{epoch}')
+        module.load_state_dict(checkpoint['model_state_dict'])
+        gen_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        checkpointd = torch.load(f'ADV_PATCH_D_Epoch{epoch}')
+        discriminator.load_state_dict(checkpointd['model_state_dict'])
+        disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
+        epoch = checkpointd['epoch']
+        file_train_g, file_train_d, file_valid_g, file_valid_d = adv_patch_train(module, discriminator, train_loader,
+                                                                                valid_loader, img_dim=256,
+                                                                                lab_normalization=lab_normalization,
+                                                                                device=device,
+                                                                                gen_optimizer=gen_optimizer,
+                                                                                disc_optimizer=disc_optimizer,
+                                                                                epochs=num_epochs, epoch=epoch)
+
+    else:
+        # Train the model(s)
+        file_train_g, file_train_d, file_valid_g, file_valid_d = adv_patch_train(module, discriminator, train_loader,
+                                                                                valid_loader, img_dim=256,
+                                                                                lab_normalization=lab_normalization,
+                                                                                device=device,
+                                                                                gen_optimizer=gen_optimizer,
+                                                                                disc_optimizer=disc_optimizer,
+                                                                                epochs=num_epochs, epoch=epoch)
 
     # Take the saved values of losses from the disk and plot them
     file_train_g.seek(0)
@@ -286,4 +354,4 @@ def adv_patch_model_main():
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_patch_model_main()
+adv_patch_model_main(False, 1)

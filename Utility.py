@@ -17,7 +17,7 @@ from Network import ZhangColorizationNetwork, quantized_bins, zhang_train_step
 from P2PDiscriminator import PatchGAN, adv_patch_train_step, adv_patch_valid_step
 
 
-def adv_patch_train(generator, discriminator, trainloader, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, img_dim, epochs=2):
+def adv_patch_train(generator, discriminator, trainloader, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, img_dim, epoch, epochs=2):
     """
       Args:
         generator: The model of the generator to train.
@@ -44,7 +44,7 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
     temp_file_valid_d = tempfile.NamedTemporaryFile(mode="w+")
 
 
-    for epoch in range(epochs):
+    for epoch in range(epoch, epochs):
 
         temp_file_train_g, temp_file_train_d, gen_train_loss, disc_train_loss = adv_patch_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_train_g, temp_file_train_d, quantized_colorspace, img_dim, epoch)
         temp_file_train_g.flush()
@@ -55,15 +55,15 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
 
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
-        store_trained_model(generator,[("GenTrain", temp_file_train_g), ("GenValid", temp_file_valid_g)], f"ADV_PATCH_G_Epoch{epoch}")
+        store_trained_model(generator,[("GenTrain", temp_file_train_g), ("GenValid", temp_file_valid_g)], f"ADV_PATCH_G_Epoch{epoch}",epoch=epoch, optimizer=gen_optimizer)
         store_trained_model(discriminator,
                             [("DiscTrain", temp_file_train_d),
-                             ("DiscValid", temp_file_valid_d)], f"ADV_PATCH_D_Epoch{epoch}")
+                             ("DiscValid", temp_file_valid_d)], f"ADV_PATCH_D_Epoch{epoch}",epoch=epoch, optimizer=disc_optimizer)
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
 
 
-def adv_base_train(generator, discriminator, trainloader, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, img_dim, epochs=2):
+def adv_base_train(generator, discriminator, trainloader, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, img_dim, epoch, epochs=2):
     """
       Args:
         generator: The model of the generator to train.
@@ -89,7 +89,7 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
     temp_file_valid_d = tempfile.NamedTemporaryFile(mode="w+")
 
 
-    for epoch in range(epochs):
+    for epoch in range(epoch, epochs):
 
         temp_file_train_g, temp_file_train_d, gen_train_loss, disc_train_loss = adv_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_train_g, temp_file_train_d, quantized_colorspace, epoch)
         temp_file_train_g.flush()
@@ -101,15 +101,15 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
         store_trained_model(generator,
                             [("GenTrain", temp_file_train_g), ("DiscTrain", temp_file_train_d), ("GenValid", temp_file_valid_g),
-                             ("DiscValid", temp_file_valid_d)], f"ADV_BASE_G_Epoch{epoch}")
+                             ("DiscValid", temp_file_valid_d)], f"ADV_BASE_G_Epoch{epoch}", epoch=epoch, optimizer=gen_optimizer)
         store_trained_model(discriminator,
                         [("DiscTrain", temp_file_train_d),
-                         ("DiscValid", temp_file_valid_d)], f"ADV_BASE_D_Epoch{epoch}")
+                         ("DiscValid", temp_file_valid_d)], f"ADV_BASE_D_Epoch{epoch}",epoch=epoch, optimizer=disc_optimizer)
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
 
 
-def zhang_train(model, trainloader, validloader, device, optimizer, lab_normalization, epochs=2):
+def zhang_train(model, trainloader, validloader, device, optimizer, lab_normalization, epoch, epochs=2):
     """
           Trains a PyTorch model and returns the training and validation losses.
 
@@ -130,7 +130,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
     print("Started training...")
     temp_file_train = tempfile.NamedTemporaryFile(mode="w+")
     temp_file_valid = tempfile.NamedTemporaryFile(mode="w+")
-    for epoch in range(epochs):
+    for epoch in range(epoch-1,epochs):
         temp_file_train, train_loss = zhang_train_step(model, trainloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_train,
@@ -143,7 +143,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
 
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
         # del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss
-        store_trained_model(model, [("Train",temp_file_train), ("Valid",temp_file_valid)], "ZHANG_WITH_PIXEL")
+        store_trained_model(model, [("Train",temp_file_train), ("Valid",temp_file_valid)], f"ZHANG_Epoch_{epoch}", epoch=epoch, optimizer=optimizer)
 
     return temp_file_train, temp_file_valid
 
@@ -213,12 +213,16 @@ def plot_loss(files, label, adversarial=True):
 
 
 # Store trained model, save training error
-def store_trained_model(model, list_err_file, model_name):
+def store_trained_model(model, list_err_file, model_name, epoch, optimizer):
     save_dir = f"./SavedModels/{model_name}/"
     # Create directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
 
-    torch.save(model.state_dict(), os.path.join(save_dir, "model.pth"))
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }, 'checkpoint.pth')
     for (name, err_file) in list_err_file:
         err_file.seek(0)
         output_file = open(f"./SavedModels/{model_name}/{name}.txt", "w")
