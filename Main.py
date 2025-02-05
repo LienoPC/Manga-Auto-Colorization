@@ -48,7 +48,7 @@ def zhang_model_main():
     print(f"Training set size: {len(training_set)}")
 
     # Batch size
-    batch_size = 16
+    batch_size = 32
     #batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(training_set)))
@@ -71,7 +71,7 @@ def zhang_model_main():
     num_epochs = 8
 
 
-    optimizer = optim.Adam(parameters_to_optimize, lr=lr)
+    optimizer = optim.Adam(parameters_to_optimize, lr=lr, betas=(0.5, 0.999))
 
 
     l_orig, img = training_set[random.randint(0, split)]
@@ -134,7 +134,7 @@ def adv_base_model_main():
     data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
 
     # Batch size
-    batch_size = 32
+    batch_size = 64
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
@@ -157,7 +157,7 @@ def adv_base_model_main():
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.0002
     lr_disc = 0.00002
-    num_epochs = 8
+    num_epochs = 7
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))
@@ -224,8 +224,6 @@ def adv_patch_model_main():
     dataset = ImageDataset("../Dataset", resize=(256, 256))
     print(f"Training set size: {len(dataset)}")
 
-    data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
-
     # Batch size
     batch_size = 64
     # batch_size = len(training_set)
@@ -250,7 +248,7 @@ def adv_patch_model_main():
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.002
     lr_disc = 0.0002
-    num_epochs = 6
+    num_epochs = 8
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.9))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.9))

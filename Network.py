@@ -154,11 +154,11 @@ class ZhangColorizationNetwork(nn.Module):
                 layer.reset_parameters()
 
 
-def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch):
+def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch, pixel):
     model.train()  # Set the model to training mode
     running_loss = 0.0
-    pixel_loss_criterion = nn.L1Loss()
-
+    pixel_loss_criterion = nn.MSELoss()
+    pixel_loss = 0.0
     for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
         # Get the LAB original image
         optimizer.zero_grad()
@@ -189,9 +189,12 @@ def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, t
         '''
         gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
         gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+        img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
         # Compute the custom loss over the Z space
         z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
-        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+        if pixel:
+            pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
 
         loss = z_loss + pixel_loss
         loss.backward()
@@ -206,10 +209,12 @@ def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, t
     return temp_file, train_loss
 
 
-def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch):
+def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch, pixel):
     # Validation
     model.eval()  # Set the model to evaluation mode
     running_loss = 0.0
+    pixel_loss_criterion = nn.MSELoss()
+    pixel_loss = 0
     with torch.no_grad():
         for l_resized_val, img_lab_orig_val in validloader:
             l_resized_val = l_resized_val.to(device)
@@ -223,9 +228,15 @@ def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, t
 
             # Apply the model
             raw_conv8_output_val, ab_output = model(l_resized_val)
-            loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
-                                                    z_ground_truth=z_ground_val)
+            gen_lab_out = torch.cat((l_resized_val, ab_output), dim=1)
+            gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+            img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
+            z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
+                                                      z_ground_truth=z_ground_val)
+            if pixel:
+                pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig_val)
 
+            loss = z_loss + pixel_loss
             running_loss += loss.item()
 
     valid_loss = running_loss / len(validloader)

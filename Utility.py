@@ -55,9 +55,10 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
 
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
-        store_trained_model(generator, [temp_file_train_g, temp_file_valid_g], "ADV_P_Generator")
-        store_trained_model(discriminator, [temp_file_train_d, temp_file_valid_d], "ADV_P_Discriminator")
-
+        store_trained_model(generator,[("GenTrain", temp_file_train_g), ("GenValid", temp_file_valid_g)], f"ADV_PATCH_G_Epoch{epoch}")
+        store_trained_model(discriminator,
+                            [("DiscTrain", temp_file_train_d),
+                             ("DiscValid", temp_file_valid_d)], f"ADV_PATCH_D_Epoch{epoch}")
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
 
@@ -82,10 +83,11 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
     quantized_colorspace = quantized_bins().to(device)
     print("Started training...")
 
-    temp_file_train_g = open(f"./SavedModels/ADV_B/GenTrain.txt", "w")
-    temp_file_train_d = open(f"./SavedModels/ADV_B/DiscTrain.txt", "w")
-    temp_file_valid_g = open(f"./SavedModels/ADV_B/GenValid.txt", "w")
-    temp_file_valid_d = open(f"./SavedModels/ADV_B/DiscValid.txt", "w")
+    temp_file_train_g = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_train_d = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_valid_g = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_valid_d = tempfile.NamedTemporaryFile(mode="w+")
+
 
     for epoch in range(epochs):
 
@@ -97,8 +99,12 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
         temp_file_valid_d.flush()
         print(f"Epoch [{epoch + 1}/{epochs}], Gen Train Loss: {gen_train_loss:.4f}, Disc Train Loss: {disc_train_loss:.4f};   Gen Valid Loss: {gen_valid_loss:.4f}, Disc Valid Loss: {disc_valid_loss:.4f}")
         del gen_train_loss, disc_train_loss, gen_valid_loss, disc_valid_loss
-        store_trained_model(generator, [temp_file_train_g, temp_file_valid_g], "ADV_B_Generator")
-        store_trained_model(discriminator, [temp_file_train_d, temp_file_valid_d], "ADV_B_Discriminator")
+        store_trained_model(generator,
+                            [("GenTrain", temp_file_train_g), ("DiscTrain", temp_file_train_d), ("GenValid", temp_file_valid_g),
+                             ("DiscValid", temp_file_valid_d)], f"ADV_BASE_G_Epoch{epoch}")
+        store_trained_model(discriminator,
+                        [("DiscTrain", temp_file_train_d),
+                         ("DiscValid", temp_file_valid_d)], f"ADV_BASE_D_Epoch{epoch}")
 
     return temp_file_train_g, temp_file_train_d, temp_file_valid_g, temp_file_valid_d
 
@@ -128,16 +134,16 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
         temp_file_train, train_loss = zhang_train_step(model, trainloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_train,
-                                                              quantized_colorspace, epoch)
+                                                              quantized_colorspace, epoch, True)
 
         temp_file_valid, valid_loss = zhang_train_step(model, validloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_valid,
-                                                              quantized_colorspace, epoch)
+                                                              quantized_colorspace, epoch, True)
 
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
         # del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss
-        store_trained_model(model, [temp_file_train, temp_file_valid], "ZHANG")
+        store_trained_model(model, [("Train",temp_file_train), ("Valid",temp_file_valid)], "ZHANG_WITH_PIXEL")
 
     return temp_file_train, temp_file_valid
 

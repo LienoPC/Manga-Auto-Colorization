@@ -15,14 +15,25 @@ from torch import Tensor
 from torch.autograd import Variable
 from torchvision.utils import make_grid
 from torcheval.metrics import PeakSignalNoiseRatio
-from Network import resize_to_64x64, inverse_h_mapping, multinomial_cross_entropy_loss_L
+from Network import resize_to_64x64, inverse_h_mapping, multinomial_cross_entropy_loss_L, ZhangColorizationNetwork, \
+    quantized_bins
 from torchmetrics import StructuralSimilarityIndexMeasure
 
+from P2PDiscriminator import PatchGAN
 
-def test_patch(generator, discriminator, device, test_loader, lab_normalization, temp_file_generator, temp_file_discriminator, quantized_colorspace, img_dim):
+
+def test_patch(device, test_loader, lab_normalization, img_dim, gen_path, disc_path):
+
+    generator = ZhangColorizationNetwork(lab_normalization)
+    generator.load_state_dict(torch.load(gen_path, weights_only=True))
+
+    discriminator = PatchGAN(3)
+    discriminator.load_state_dict(torch.load(disc_path, weights_only=True))
     generator.eval()  # model to eval
-    test_loss = 0
-    correct = 0
+    discriminator.eval()
+
+    temp_file_generator = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_discriminator = tempfile.NamedTemporaryFile(mode="w+")
 
     r_gen_loss = 0.0
     r_disc_loss = 0.0
@@ -31,6 +42,8 @@ def test_patch(generator, discriminator, device, test_loader, lab_normalization,
     pixel_loss_criterion = nn.L1Loss()
     psnr_metric = PeakSignalNoiseRatio()
     ssim_metric = StructuralSimilarityIndexMeasure(reduction='elementwise_mean')
+
+    quantized_colorspace = quantized_bins().to(device)
     # Loss multiply factors
     DISCRIMINATOR_LOSS_THRESHOLD = 0.4
     PIXEL_FACTOR = 1.0
@@ -102,3 +115,6 @@ def test_patch(generator, discriminator, device, test_loader, lab_normalization,
     temp_file_discriminator.write(f"Test Discriminator Loss:{disc_valid_loss}\n")
     temp_file_generator.write(f"PSNR: {psnr_loss}")
     temp_file_generator.write(f"SSIM: {ssim_loss}")
+    temp_file_generator.flush()
+    temp_file_discriminator.flush()
+    return temp_file_generator, temp_file_discriminator

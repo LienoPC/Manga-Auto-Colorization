@@ -74,7 +74,7 @@ def adv_patch_train_step(generator, discriminator, trainloader, device, gen_opti
     r_disc_loss = 0.0
     # Define loss criterion
     adv_loss_criterion = nn.BCELoss()
-    pixel_loss_criterion = nn.L1Loss()
+    pixel_loss_criterion = nn.MSELoss()
 
     for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
         # Define tensor used for adversarial loss
@@ -181,7 +181,7 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
 
     # Define loss criterion
     adv_loss_criterion = nn.BCELoss()
-    pixel_loss_criterion = nn.L1Loss()
+    pixel_loss_criterion = nn.MSELoss()
     # Calculate output of image discriminator (PatchGAN)
     patch = (1, img_dim // 2 ** 4, img_dim // 2 ** 4)
     with torch.no_grad():
