@@ -44,7 +44,7 @@ def adv_patch_train(generator, discriminator, trainloader, validloader, device, 
     temp_file_valid_d = tempfile.NamedTemporaryFile(mode="w+")
 
 
-    for epoch in range(epoch, epochs):
+    for epoch in range(epoch, epochs+1):
 
         temp_file_train_g, temp_file_train_d, gen_train_loss, disc_train_loss = adv_patch_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_train_g, temp_file_train_d, quantized_colorspace, img_dim, epoch)
         temp_file_train_g.flush()
@@ -89,7 +89,7 @@ def adv_base_train(generator, discriminator, trainloader, validloader, device, g
     temp_file_valid_d = tempfile.NamedTemporaryFile(mode="w+")
 
 
-    for epoch in range(epoch, epochs):
+    for epoch in range(epoch, epochs+1):
 
         temp_file_train_g, temp_file_train_d, gen_train_loss, disc_train_loss = adv_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_train_g, temp_file_train_d, quantized_colorspace, epoch)
         temp_file_train_g.flush()
@@ -130,7 +130,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
     print("Started training...")
     temp_file_train = tempfile.NamedTemporaryFile(mode="w+")
     temp_file_valid = tempfile.NamedTemporaryFile(mode="w+")
-    for epoch in range(epoch,epochs):
+    for epoch in range(epoch,epochs+1):
         temp_file_train, train_loss = zhang_train_step(model, trainloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_train,

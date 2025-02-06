@@ -94,6 +94,7 @@ def zhang_model_main(checkpoint=False, epoch=0):
         module.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
+        del checkpoint
         train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs, epoch=epoch)
     else:
         train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs)
@@ -202,9 +203,11 @@ def adv_base_model_main(checkpoint, epoch):
         discriminator.load_state_dict(checkpointd['model_state_dict'])
         disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
         epoch = checkpointd['epoch']
+        del checkpointd, checkpoint
         file_train_g, file_train_d, file_valid_g, file_valid_d = adv_base_train(module, discriminator, train_loader, valid_loader, img_dim=256, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs, epoch=epoch)
 
     else:
+        epoch = 1
         # Train the model(s)
         file_train_g, file_train_d, file_valid_g, file_valid_d = adv_base_train(module, discriminator, train_loader, valid_loader, img_dim=256, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs, epoch=epoch)
 
@@ -314,6 +317,7 @@ def adv_patch_model_main(checkpoint, epoch):
         discriminator.load_state_dict(checkpointd['model_state_dict'])
         disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
         epoch = checkpointd['epoch']
+        del checkpointd, checkpoint
         file_train_g, file_train_d, file_valid_g, file_valid_d = adv_patch_train(module, discriminator, train_loader,
                                                                                 valid_loader, img_dim=256,
                                                                                 lab_normalization=lab_normalization,
@@ -323,6 +327,7 @@ def adv_patch_model_main(checkpoint, epoch):
                                                                                 epochs=num_epochs, epoch=epoch)
 
     else:
+        epoch = 1
         # Train the model(s)
         file_train_g, file_train_d, file_valid_g, file_valid_d = adv_patch_train(module, discriminator, train_loader,
                                                                                 valid_loader, img_dim=256,

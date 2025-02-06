@@ -142,8 +142,8 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
 
 
 
-        r_gen_loss += gen_loss
-        r_disc_loss += disc_loss
+        r_gen_loss += float(gen_loss.item())
+        r_disc_loss += float(disc_loss.item())
 
         #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
         print(f"Batch {batch_idx}/{len(trainloader)}")
@@ -217,8 +217,8 @@ def adv_valid_step(generator, discriminator, validloader, device, gen_optimizer,
 
             gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
 
-            r_gen_loss += gen_loss
-            r_disc_loss += disc_loss
+            r_gen_loss += gen_loss.item()
+            r_disc_loss += disc_loss.item()
             # Cleanup
             del l_resized_val, img_lab_orig_val, ab_groundtruth, z_ground, raw_conv8_output, ab_output, target_truth, target_false
             torch.cuda.empty_cache()

@@ -149,8 +149,8 @@ def adv_patch_train_step(generator, discriminator, trainloader, device, gen_opti
 
 
 
-        r_gen_loss += gen_loss
-        r_disc_loss += disc_loss
+        r_gen_loss += float(gen_loss.item())
+        r_disc_loss += float(disc_loss.item())
 
         #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
         print(f"Batch {batch_idx}/{len(trainloader)}")
@@ -220,8 +220,6 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
 
             disc_loss = 0.5 * (disc_gen_loss + disc_ground_loss)
 
-            r_disc_loss += disc_loss.item()
-
             # Compute the loss of the generator
             adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
             z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
@@ -230,8 +228,8 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
             gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
             #plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
 
-            r_gen_loss += gen_loss
-            r_disc_loss += disc_loss
+            r_gen_loss += float(gen_loss.item())
+            r_disc_loss += float(disc_loss.item())
             # Cleanup
             del l_resized_val, img_lab_orig_val, ab_groundtruth, z_ground, raw_conv8_output, ab_output
             torch.cuda.empty_cache()
