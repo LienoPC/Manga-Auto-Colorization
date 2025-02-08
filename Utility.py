@@ -134,12 +134,12 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
         temp_file_train, train_loss = zhang_train_step(model, trainloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_train,
-                                                              quantized_colorspace, epoch, True)
+                                                              quantized_colorspace, epoch, False)
 
         temp_file_valid, valid_loss = zhang_train_step(model, validloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_valid,
-                                                              quantized_colorspace, epoch, True)
+                                                              quantized_colorspace, epoch, False)
 
         print(f"Epoch [{epoch}/{epochs}], Train Loss: {train_loss:.4f}, Valid Loss: {valid_loss:.4f}")
         # del gen_train_loss, gen_valid_loss, gen_valid_loss, disc_valid_loss

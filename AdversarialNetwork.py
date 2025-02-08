@@ -57,9 +57,9 @@ class Discriminator(nn.Module):
 
 def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_generator, temp_file_discriminator, quantized_colorspace, epoch):
 
-    DISCRIMINATOR_LOSS_THRESHOLD = 0.4
+    DISCRIMINATOR_LOSS_THRESHOLD = 1.0
     PIXEL_FACTOR = 1.0
-    Z_LOSS_FACTOR = 3.0
+    Z_LOSS_FACTOR = 1.0
 
     # Set the model to training mode
     generator.train()
@@ -161,8 +161,8 @@ def adv_train_step(generator, discriminator, trainloader, device, gen_optimizer,
 def adv_valid_step(generator, discriminator, validloader, device, gen_optimizer, disc_optimizer, lab_normalization, temp_file_generator, temp_file_discriminator, quantized_colorspace, epoch):
 
     DISCRIMINATOR_LOSS_THRESHOLD = 1.0
-    PIXEL_FACTOR = 2.0
-    Z_LOSS_FACTOR = 3.0
+    PIXEL_FACTOR = 1.0
+    Z_LOSS_FACTOR = 1.0
     # Compute the quantized bins and move them to the correct device
     adv_loss_criterion = nn.BCELoss()
     pixel_loss_criterion = nn.MSELoss()

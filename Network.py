@@ -515,7 +515,8 @@ def quantized_bins(grid_step=10, valid_range_a=(-110, 110), valid_range_b=(-110,
 
     # Convert to a tensor
     quantized_bins = torch.tensor(valid_ab_values, dtype=torch.float32)
-
+    quantized_bins /= 110.0
+    print(quantized_bins)
     # print(f'Quantized bins:\n{quantized_bins}')
     del kmeans, in_gamut_mask, rgb_colors,lab_colors, ab_grid, a_values, b_values
     return quantized_bins
