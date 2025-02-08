@@ -181,7 +181,7 @@ def adv_base_model_main(checkpoint, epoch):
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.0002
     lr_disc = 0.00002
-    num_epochs = 7
+    num_epochs = 35
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))
@@ -204,6 +204,7 @@ def adv_base_model_main(checkpoint, epoch):
         disc_optimizer.load_state_dict(checkpointd['optimizer_state_dict'])
         epoch = checkpointd['epoch']
         del checkpointd, checkpoint
+        print("Checkpoint resumed.")
         file_train_g, file_train_d, file_valid_g, file_valid_d = adv_base_train(module, discriminator, train_loader, valid_loader, img_dim=256, lab_normalization=lab_normalization,device=device, gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, epochs=num_epochs, epoch=epoch)
 
     else:
@@ -359,4 +360,4 @@ def adv_patch_model_main(checkpoint, epoch):
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_patch_model_main(True, 1)
+adv_base_model_main(True, 1)
