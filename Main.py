@@ -74,8 +74,8 @@ def zhang_model_main(checkpoint=False, epoch=0):
 
     # Optimizer
     parameters_to_optimize = module.parameters()
-    lr = 0.001
-    num_epochs = 8
+    lr = 0.0001
+    num_epochs = 25
 
 
     optimizer = optim.Adam(parameters_to_optimize, lr=lr, betas=(0.5, 0.999))
@@ -97,7 +97,7 @@ def zhang_model_main(checkpoint=False, epoch=0):
         del checkpoint
         train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs, epoch=epoch)
     else:
-        train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs)
+        train_loss_file, valid_loss_file = zhang_train(module, train_loader, valid_loader, device=device, optimizer=optimizer, lab_normalization=lab_normalization, epochs=num_epochs, epoch=epoch)
 
     train_loss_file.seek(0)
     valid_loss_file.seek(0)
@@ -149,7 +149,7 @@ def adv_base_model_main(checkpoint, epoch):
     data_loader = torch.utils.data.DataLoader(dataset, shuffle=False)
 
     # Batch size
-    batch_size = 64
+    batch_size = 32
     # batch_size = len(training_set)
     # Preparing indices for validation set
     indices = list(range(len(dataset)))
@@ -181,7 +181,7 @@ def adv_base_model_main(checkpoint, epoch):
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.0002
     lr_disc = 0.00002
-    num_epochs = 35
+    num_epochs = 20
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))
@@ -294,9 +294,9 @@ def adv_patch_model_main(checkpoint, epoch):
     # Optimizer
     gen_parameters_to_optimize = module.parameters()
     disc_parameters_to_optimize = discriminator.parameters()
-    lr_gen = 0.002
+    lr_gen = 0.0002
     lr_disc = 0.0002
-    num_epochs = 8
+    num_epochs = 6
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.9))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.9))
@@ -352,7 +352,7 @@ def adv_patch_model_main(checkpoint, epoch):
     plt.figure()
     plt.imshow(rgb_img_out)
     plt.show()
-    store_trained_model(module, [("GenTrain",file_train_g), ("DiscTrain",file_train_d), ("GenValid",file_valid_g), ("DiscValid",file_valid_d)], "ADV_PATCH")
+    store_trained_model(module, [("GenTrain",file_train_g), ("DiscTrain",file_train_d), ("GenValid",file_valid_g), ("DiscValid",file_valid_d)], "ADV_PATCH", num_epochs, gen_optimizer)
 
 
 
