@@ -187,16 +187,11 @@ def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, t
         print("\n\n")
         print(z_ground)
         '''
-        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
-        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
-        img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
         # Compute the custom loss over the Z space
         z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
 
-        if pixel:
-            pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
 
-        loss = z_loss + pixel_loss
+        loss = z_loss
         loss.backward()
         optimizer.step()
 
@@ -222,21 +217,17 @@ def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, t
 
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth_val = img_lab_orig_val[:, 1:3, :, :]
+            ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
             ab_groundtruth_val = resize_to_64x64(ab_groundtruth_val)
             z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
 
             # Apply the model
             raw_conv8_output_val, ab_output = model(l_resized_val)
-            gen_lab_out = torch.cat((l_resized_val, ab_output), dim=1)
-            gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
-            img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
             z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
                                                       z_ground_truth=z_ground_val)
-            if pixel:
-                pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig_val)
 
-            loss = z_loss + pixel_loss
+            loss = z_loss
             running_loss += loss.item()
 
     valid_loss = running_loss / len(validloader)
@@ -455,7 +446,8 @@ def zhang_train_progressed(model, trainloader, validloader, device, optimizer, e
 def multinomial_cross_entropy_loss_L(raw_network_output, z_ground_truth):
     # Apply softmax to ensure Z_predicted is a valid probability distribution
     z_predicted = torch.softmax(raw_network_output, dim=-1)
-
+    #print(f'Raw network softmax: {z_predicted}')
+    #print(f"Z_ground_truth: {z_ground_truth}")
     # Masking to avoid getting a nan result from applying a log function to the z_predicted values
     #mask = z_predicted > 0
     #masked_log = torch.zeros_like(z_predicted, device=z_predicted.device)
@@ -463,15 +455,16 @@ def multinomial_cross_entropy_loss_L(raw_network_output, z_ground_truth):
 
     eps = 1e-8
     log_z_predicted = torch.log(z_predicted + eps)
-    # print(f'Z_ground_truth shape: {Z_ground_truth.shape}')
-    # print(f'Z_predicted shape: {Z_predicted.shape}')
+    #print(f'Z_ground_truth max: {z_ground_truth.max()} and min {z_ground_truth.min()}')
+    #print(f'Z_predicted max: {z_predicted.max()} and min {z_predicted.min()}')
 
 
 
     loss = -torch.sum(z_ground_truth * log_z_predicted)
+
     # Normalize loss by the number of elements
     loss /= z_ground_truth.numel()
-    #print(f'Loss: {loss}')
+
     del log_z_predicted, z_predicted, eps
     return loss
 
@@ -515,9 +508,9 @@ def quantized_bins(grid_step=10, valid_range_a=(-110, 110), valid_range_b=(-110,
 
     # Convert to a tensor
     quantized_bins = torch.tensor(valid_ab_values, dtype=torch.float32)
-    quantized_bins /= 110.0
-    print(quantized_bins)
-    # print(f'Quantized bins:\n{quantized_bins}')
+    #quantized_bins /= 110.0
+    #print(quantized_bins)
+    #print(f'Quantized bins:\n{quantized_bins}')
     del kmeans, in_gamut_mask, rgb_colors,lab_colors, ab_grid, a_values, b_values
     return quantized_bins
 
