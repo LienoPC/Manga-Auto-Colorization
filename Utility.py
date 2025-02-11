@@ -207,7 +207,7 @@ def plot_loss(files, label, adversarial=True):
 
 
             # Create two lines for generator and discriminator
-        line_gen, = ax.plot(x_values, y_values, 'o-', label=f"{label}")
+        line_gen, = ax.plot(x_values, y_values, linestyle='-', marker='', label=f"{label}")
         plt.legend()
         plt.show()
 

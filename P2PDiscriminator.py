@@ -198,8 +198,6 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
 
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth = img_lab_orig_val[:, 1:3, :, :]
-            # Normalize the AB groundtruth
-            ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
 
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
             ab_groundtruth = resize_to_64x64(ab_groundtruth)

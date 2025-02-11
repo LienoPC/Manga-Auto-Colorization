@@ -113,7 +113,8 @@ def test_zhang(device, test_loader, lab_normalization, img_dim, model_path):
             z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
                                                       z_ground_truth=z_ground_val)
 
-            running_loss += z_loss.item()
+            running_loss += float(z_loss.item())
+            print(f"Running loss: {running_loss}\n")
             # After loss we compute PSNR
             psnr_metric.update(gen_lab_out, img_lab_orig)
             ssim_metric.update(gen_lab_out, img_lab_orig)

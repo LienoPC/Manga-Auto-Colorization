@@ -112,11 +112,10 @@ def test_patch_main():
     store_test([("Generator", file_gen), ("Discriminator", file_disc)], "Patch")
 
 
-#test_patch_main()
-file_train_g = open("SavedModels/Good/ADV_PATCH_G_Epoch40/GenTrain.txt", "r")
-file_valid_g = open("SavedModels/Good/ADV_PATCH_G_Epoch40/GenValid.txt", "r")
-file_train_d = open("SavedModels/Good/ADV_PATCH_D_Epoch40/DiscTrain.txt", "r")
-file_valid_d = open("SavedModels/Good/ADV_PATCH_D_Epoch40/DiscValid.txt", "r")
+test_zhang_main()
+file_train = open("SavedModels/Good/ZHANG_Epoch_25/Train.txt", "r")
+file_valid = open("SavedModels/Good/ZHANG_Epoch_25/Valid.txt", "r")
 
-plot_loss([file_train_g, file_train_d], "Train", True)
-plot_loss([file_valid_g, file_valid_d], "Valid", True)
+
+plot_loss([file_train], "Train", False)
+plot_loss([file_valid], "Valid", False)
