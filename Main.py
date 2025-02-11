@@ -74,8 +74,8 @@ def zhang_model_main(checkpoint=False, epoch=0):
 
     # Optimizer
     parameters_to_optimize = module.parameters()
-    lr = 0.0001
-    num_epochs = 25
+    lr = 0.001
+    num_epochs = 15
 
 
     optimizer = optim.Adam(parameters_to_optimize, lr=lr, betas=(0.5, 0.999))
@@ -359,4 +359,4 @@ def adv_patch_model_main(checkpoint, epoch):
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_base_model_main(True, 15)
+zhang_model_main(False, 1)

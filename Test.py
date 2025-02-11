@@ -117,5 +117,5 @@ file_train = open("SavedModels/Good/ZHANG_Epoch_25/Train.txt", "r")
 file_valid = open("SavedModels/Good/ZHANG_Epoch_25/Valid.txt", "r")
 
 
-plot_loss([file_train], "Train", False)
-plot_loss([file_valid], "Valid", False)
+#plot_loss([file_train], "Train", False)
+#plot_loss([file_valid], "Valid", False)
