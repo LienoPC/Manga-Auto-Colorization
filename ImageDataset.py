@@ -135,6 +135,7 @@ class ImageProcess:
         # tens_orig_l 	1 x 1 x H_orig x W_orig
         # out_ab 		1 x 2 x H x W
 
+
         if tens_orig_l.ndim == 3:  # Missing batch dimension
             tens_orig_l = tens_orig_l.unsqueeze(0)
         if out_ab.ndim == 3:  # Missing batch dimension

@@ -180,8 +180,8 @@ def plot_loss(files, label, adversarial=True):
             y_disc_values.append(y_disc)
 
             # Create two lines for generator and discriminator
-        line_gen, = ax.plot(x_gen_values, y_gen_values, 'o-', label=f"Generator {label}")
-        line_disc, = ax.plot(x_disc_values, y_disc_values, 'x-', label=f"Discriminator {label}")
+        line_gen, = ax.plot(x_gen_values, y_gen_values, linestyle='-', marker='', label=f"Generator {label}")
+        line_disc, = ax.plot(x_disc_values, y_disc_values, linestyle='-', marker='', label=f"Discriminator {label}")
         plt.legend()
         plt.show()
     else:

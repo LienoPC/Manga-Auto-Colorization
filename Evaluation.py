@@ -1,5 +1,6 @@
 import tempfile
 
+import cv2
 import torchvision
 import torch
 import torch.nn as nn
@@ -15,6 +16,10 @@ from torch import Tensor
 from torch.autograd import Variable
 from torchvision.utils import make_grid
 from torcheval.metrics import PeakSignalNoiseRatio
+from pathlib import Path
+
+from AdversarialNetwork import Discriminator
+from ImageDataset import ImageProcess
 from Network import resize_to_64x64, inverse_h_mapping, multinomial_cross_entropy_loss_L, ZhangColorizationNetwork, \
     quantized_bins
 from torchmetrics import StructuralSimilarityIndexMeasure
@@ -22,13 +27,131 @@ from torchmetrics import StructuralSimilarityIndexMeasure
 from P2PDiscriminator import PatchGAN
 
 
+def lab_to_rgb_batch(lab_tensors):
+    """Convert a batch of LAB tensors (BATCH, 3, HEIGHT, WIDTH) to RGB tensors with the same shape."""
+    batch_size, _, height, width = lab_tensors.shape
+    rgb_tensors = torch.zeros((batch_size, 3, height, width), dtype=torch.float32)
+
+    for i, lab_tensor in enumerate(lab_tensors):
+        lab_numpy = lab_tensor.permute(1, 2, 0).cpu().numpy().astype(np.float32)
+
+        # Clamp values to valid range before conversion
+        lab_numpy = np.clip(lab_numpy, [0, -128, -128], [100, 127, 127]).astype(np.float32)
+
+        rgb_image = cv2.cvtColor(lab_numpy, cv2.COLOR_LAB2RGB)
+        #print(f"Rgb image: {rgb_image}")
+
+        rgb_tensors[i] = torch.from_numpy(rgb_image).permute(2, 0, 1).to(dtype=torch.float32)
+        #print(f"Rgb tensor: {rgb_tensors[i]}")
+
+    return rgb_tensors
+
+'''
+def lab_to_rgb_batch(l_resized, ab_channel):
+    """Convert a batch of LAB tensors (BATCH, 3, HEIGHT, WIDTH) to RGB tensors with the same shape."""
+    batch_size, _, height, width =  ab_channel.shape
+    rgb_tensors = torch.zeros((batch_size, 3, height, width), dtype=torch.uint8)
+
+    for i, (l_channel, ab_c) in enumerate(zip(l_resized, ab_channel)):
+        print(f"Batch {i}, l_channel {l_channel.shape}, ab_channel {ab_c.shape}")
+        #rgb_tensors[i] = torch.tensor(ImageProcess.postprocess_tens(l_channel, ab_c)).permute(0, 3, 1, 2)
+        rgb_tensors[i] = torch.from_numpy(ImageProcess.postprocess_tens(l_channel, ab_c)).permute(2, 0, 1).to(dtype=torch.uint8)
+    return rgb_tensors
+'''
+
+
+
+def save_rgb_batch_as_jpg(rgb_tensors, output_folder, prefix, batch):
+    """Save a batch of unnormalized RGB tensors (BATCH, 3, HEIGHT, WIDTH) as JPG files."""
+    output_folder = Path(output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    for i, rgb_tensor in enumerate(rgb_tensors):
+        rgb_image = (rgb_tensor.permute(1, 2, 0).cpu().numpy()*255.0).astype(np.uint8) # Convert to (H, W, 3)
+        filename = output_folder / f"{prefix}_{i}_{batch}.jpg"
+        cv2.imwrite(str(filename), cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR))
+
+    print(f"Saved {len(rgb_tensors)} images to {output_folder}")
+
+def test_zhang(device, test_loader, lab_normalization, img_dim, model_path):
+    save_dir = f"./SavedTests/Zhang/ColoredImages"
+
+    model = ZhangColorizationNetwork(lab_normalization)
+    checkpoint = torch.load(model_path, weights_only=True)
+
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device)
+
+    temp_file = tempfile.NamedTemporaryFile(mode="w+")
+
+    r_gen_loss = 0.0
+    r_disc_loss = 0.0
+    psnr_metric = PeakSignalNoiseRatio().to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(reduction='elementwise_mean').to(device)
+
+    quantized_colorspace = quantized_bins().to(device)
+    # Validation
+    model.eval()  # Set the model to evaluation mode
+    running_loss = 0.0
+    batch = 0
+
+    with torch.no_grad():
+        for l_resized, img_lab_orig in test_loader:
+            l_resized = l_resized.to(device)
+            img_lab_orig = img_lab_orig.to(device)
+
+            # Extract the ground truth ab and convert it to tensor
+            ab_groundtruth_val = img_lab_orig[:, 1:3, :, :]
+            # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+            ab_groundtruth_val = resize_to_64x64(ab_groundtruth_val)
+            z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
+
+            # Apply the model
+            raw_conv8_output_val, ab_output = model(l_resized)
+            gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+
+            z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
+                                                      z_ground_truth=z_ground_val)
+
+            running_loss += z_loss.item()
+            # After loss we compute PSNR
+            psnr_metric.update(gen_lab_out, img_lab_orig)
+            ssim_metric.update(gen_lab_out, img_lab_orig)
+
+            gen_lab_out = lab_to_rgb_batch(gen_lab_out)
+            img_lab_orig = lab_to_rgb_batch(img_lab_orig)
+            save_rgb_batch_as_jpg(gen_lab_out, save_dir, 'patch', batch)
+            #save_rgb_batch_as_jpg(img_lab_orig, f"{save_dir}/Original", 'patch', batch)
+
+
+
+            batch += 1
+
+    test_loss = running_loss / len(test_loader)
+    psnr_loss = psnr_metric.compute()
+    ssim_loss = ssim_metric.compute()
+    temp_file.write(f"Test Generator Loss: {test_loss}\n")
+    temp_file.write(f"PSNR: {psnr_loss}\n")
+    temp_file.write(f"SSIM: {ssim_loss}\n")
+    temp_file.flush()
+    return temp_file
+
+
 def test_patch(device, test_loader, lab_normalization, img_dim, gen_path, disc_path):
+    save_dir = f"./SavedTests/Patch/ColoredImages"
 
     generator = ZhangColorizationNetwork(lab_normalization)
-    generator.load_state_dict(torch.load(gen_path, weights_only=True))
+    checkpoint = torch.load(gen_path, weights_only=True)
+
+    generator.load_state_dict(checkpoint['model_state_dict'])
 
     discriminator = PatchGAN(3)
-    discriminator.load_state_dict(torch.load(disc_path, weights_only=True))
+    checkpoint = torch.load(disc_path, weights_only=True)
+    discriminator.load_state_dict(checkpoint['model_state_dict'])
+
+    generator.to(device)
+    discriminator.to(device)
+
     generator.eval()  # model to eval
     discriminator.eval()
 
@@ -40,81 +163,201 @@ def test_patch(device, test_loader, lab_normalization, img_dim, gen_path, disc_p
     # Define loss criterion
     adv_loss_criterion = nn.BCELoss()
     pixel_loss_criterion = nn.L1Loss()
-    psnr_metric = PeakSignalNoiseRatio()
-    ssim_metric = StructuralSimilarityIndexMeasure(reduction='elementwise_mean')
+    psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(reduction='elementwise_mean').to(device)
 
     quantized_colorspace = quantized_bins().to(device)
     # Loss multiply factors
     DISCRIMINATOR_LOSS_THRESHOLD = 0.4
     PIXEL_FACTOR = 1.0
-    Z_LOSS_FACTOR = 3.0
+    Z_LOSS_FACTOR = 1.0
 
     # Calculate output of image discriminator (PatchGAN)
     patch = (1, img_dim // 2 ** 4, img_dim // 2 ** 4)
+    batch = 0
+    with torch.no_grad():
+        for l_resized, img_lab_orig in test_loader:
+            target_truth = Variable(Tensor(np.ones((img_lab_orig.size(0), *patch))), requires_grad=False)
+            target_false = Variable(Tensor(np.zeros((img_lab_orig.size(0), *patch))), requires_grad=False)
+
+            target_truth = target_truth.to(device)
+            target_false = target_false.to(device)
+
+            l_resized = l_resized.to(device)
+            img_lab_orig = img_lab_orig.to(device)
+            img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
+
+            # Extract the ground truth ab and convert it to tensor
+            ab_groundtruth = img_lab_orig[:, 1:3, :, :]
+
+            # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+            ab_groundtruth = resize_to_64x64(ab_groundtruth)
+            z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
+
+            # Calculate the final generated image
+            raw_conv8_output, ab_output = generator(l_resized)
+            gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+            gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+
+            # Apply discriminator over ground_truth
+            disc_ground = discriminator(l_resized, img_lab_orig)
+            disc_ground = disc_ground.to(device)
+            disc_ground_loss = adv_loss_criterion(disc_ground, target_truth)
+
+            disc_gen = discriminator(l_resized, gen_lab_out)
+            disc_gen_loss = adv_loss_criterion(disc_gen, target_false)
+
+            disc_loss = 0.5 * (disc_gen_loss + disc_ground_loss)
+
+            r_disc_loss += disc_loss.item()
+
+            # Compute the loss of the generator
+            adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
+            z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
+            pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+            gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
+            # plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
+
+            gen_lab_out = lab_normalization.unnormalize_lab_batch(gen_lab_out)
+            img_lab_orig = lab_normalization.unnormalize_lab_batch(img_lab_orig)
+            # After loss we compute PSNR
+            psnr_metric.update(gen_lab_out, img_lab_orig)
+            ssim_metric.update(gen_lab_out, img_lab_orig)
+            gen_lab_out = lab_to_rgb_batch(gen_lab_out)
+            img_lab_orig = lab_to_rgb_batch(img_lab_orig)
+            save_rgb_batch_as_jpg(gen_lab_out, save_dir, 'patch', batch)
+            #save_rgb_batch_as_jpg(gen_lab_out, f"{save_dir}/Original", 'patch', batch)
 
 
-    for l_resized, img_lab_orig in test_loader:
-        target_truth = Variable(Tensor(np.ones((img_lab_orig.size(0), *patch))), requires_grad=False)
-        target_false = Variable(Tensor(np.zeros((img_lab_orig.size(0), *patch))), requires_grad=False)
 
-        target_truth = target_truth.to(device)
-        target_false = target_false.to(device)
+            r_gen_loss += gen_loss
+            r_disc_loss += disc_loss
+            # Cleanup
+            del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output
+            #torch.cuda.empty_cache()
+            batch += 1
 
-        l_resized = l_resized.to(device)
-        img_lab_orig = img_lab_orig.to(device)
-        img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
-
-        # Extract the ground truth ab and convert it to tensor
-        ab_groundtruth = img_lab_orig[:, 1:3, :, :]
-        # Normalize the AB groundtruth
-        ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
-
-        # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
-        ab_groundtruth = resize_to_64x64(ab_groundtruth)
-        z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
-
-        # Calculate the final generated image
-        raw_conv8_output, ab_output = generator(l_resized)
-        gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
-        gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
-
-        # Apply discriminator over ground_truth
-        disc_ground = discriminator(l_resized, img_lab_orig)
-        disc_ground = disc_ground.to(device)
-        disc_ground_loss = adv_loss_criterion(disc_ground, target_truth)
-
-        disc_gen = discriminator(l_resized, gen_lab_out)
-        disc_gen_loss = adv_loss_criterion(disc_gen, target_false)
-
-        disc_loss = 0.5 * (disc_gen_loss + disc_ground_loss)
-
-        r_disc_loss += disc_loss.item()
-
-        # Compute the loss of the generator
-        adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
-        z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
-        pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
-
-        gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
-        # plot_batch_images(gen_lab_out.detach().to("cpu"), generator.lab_normalization)
-
-        # After loss we compute PSNR
-        psnr_metric.update(gen_lab_out, img_lab_orig)
-        ssim_metric.update(gen_lab_out, img_lab_orig)
-        r_gen_loss += gen_loss
-        r_disc_loss += disc_loss
-        # Cleanup
-        del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output
-        torch.cuda.empty_cache()
-
-    gen_valid_loss = r_gen_loss / len(test_loader)
-    disc_valid_loss = r_disc_loss / len(test_loader)
+    gen_test_loss = r_gen_loss / len(test_loader)
+    disc_test_loss = r_disc_loss / len(test_loader)
     psnr_loss = psnr_metric.compute()
     ssim_loss = ssim_metric.compute()
-    temp_file_generator.write(f"Test Generator Loss: {gen_valid_loss}\n")
-    temp_file_discriminator.write(f"Test Discriminator Loss:{disc_valid_loss}\n")
-    temp_file_generator.write(f"PSNR: {psnr_loss}")
-    temp_file_generator.write(f"SSIM: {ssim_loss}")
+    temp_file_generator.write(f"Test Generator Loss: {gen_test_loss}\n")
+    temp_file_discriminator.write(f"Test Discriminator Loss:{disc_test_loss}\n")
+    temp_file_generator.write(f"PSNR: {psnr_loss}\n")
+    temp_file_generator.write(f"SSIM: {ssim_loss}\n")
     temp_file_generator.flush()
     temp_file_discriminator.flush()
     return temp_file_generator, temp_file_discriminator
+
+
+
+def test_adv(device, test_loader, lab_normalization, img_dim, gen_path, disc_path):
+    save_dir = f"./SavedTests/Adv/ColoredImages"
+
+    DISCRIMINATOR_LOSS_THRESHOLD = 1.0
+    PIXEL_FACTOR = 1.0
+    Z_LOSS_FACTOR = 1.0
+    # Compute the quantized bins and move them to the correct device
+    adv_loss_criterion = nn.BCELoss()
+    pixel_loss_criterion = nn.MSELoss()
+    generator = ZhangColorizationNetwork(lab_normalization)
+    checkpoint = torch.load(gen_path, weights_only=True)
+
+    generator.load_state_dict(checkpoint['model_state_dict'])
+
+    discriminator = Discriminator()
+    checkpoint = torch.load(disc_path, weights_only=True)
+    discriminator.load_state_dict(checkpoint['model_state_dict'])
+
+    temp_file_generator = tempfile.NamedTemporaryFile(mode="w+")
+    temp_file_discriminator = tempfile.NamedTemporaryFile(mode="w+")
+
+    generator.to(device)
+    discriminator.to(device)
+
+    psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(reduction='elementwise_mean').to(device)
+    # Validation
+    generator.eval()
+    discriminator.eval()
+    r_gen_loss = 0.0
+    r_disc_loss = 0.0
+    quantized_colorspace = quantized_bins().to(device)
+    batch = 0
+    with torch.no_grad():
+        for l_resized, img_lab_orig in test_loader:
+            target_truth = Variable(torch.ones(l_resized.shape[0], 1), requires_grad=False)
+            target_false = Variable(torch.zeros(l_resized.shape[0], 1), requires_grad=False)
+
+            target_truth = target_truth.to(device)
+            target_false = target_false.to(device)
+
+            l_resized = l_resized.to(device)
+            img_lab_orig = img_lab_orig.to(device)
+            img_lab_orig = lab_normalization.normalize_lab_batch(img_lab_orig)
+            # Extract the ground truth ab and convert it to tensor
+            ab_groundtruth = img_lab_orig[:, 1:3, :, :]
+            # Normalize the AB groundtruth
+            ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
+
+            # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
+            ab_groundtruth = resize_to_64x64(ab_groundtruth)
+            z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
+
+            # Calculate the final generated image
+            raw_conv8_output, ab_output = generator(l_resized)
+            gen_lab_out = torch.cat((l_resized, ab_output), dim=1)
+            gen_lab_out = lab_normalization.normalize_lab_batch(gen_lab_out)
+
+            # Apply discriminator over ground_truth
+            disc_ground = discriminator(img_lab_orig)
+            disc_ground = disc_ground.to(device)
+            disc_ground_loss = adv_loss_criterion(disc_ground, target_truth)
+
+            disc_gen = discriminator(gen_lab_out)
+            disc_gen_loss = adv_loss_criterion(disc_gen, target_false)
+
+            disc_loss = disc_gen_loss + disc_ground_loss
+
+            r_disc_loss += disc_loss.item()
+
+            # Compute the loss of the generator
+            adv_loss = adv_loss_criterion(disc_gen, target_truth)  # Fool the discriminator
+            z_loss = multinomial_cross_entropy_loss_L(raw_conv8_output, z_ground_truth=z_ground)
+            pixel_loss = pixel_loss_criterion(gen_lab_out, img_lab_orig)
+
+            gen_loss = adv_loss + Z_LOSS_FACTOR * z_loss + PIXEL_FACTOR * pixel_loss
+
+            gen_lab_out = lab_normalization.unnormalize_lab_batch(gen_lab_out)
+            img_lab_orig = lab_normalization.unnormalize_lab_batch(img_lab_orig)
+            # After loss we compute PSNR
+            psnr_metric.update(gen_lab_out, img_lab_orig)
+            ssim_metric.update(gen_lab_out, img_lab_orig)
+            gen_lab_out = lab_to_rgb_batch(gen_lab_out)
+            img_lab_orig = lab_to_rgb_batch(img_lab_orig)
+            save_rgb_batch_as_jpg(gen_lab_out, save_dir, 'patch', batch)
+            #save_rgb_batch_as_jpg(gen_lab_out, f"{save_dir}/Original", 'patch', batch)
+
+
+
+            r_gen_loss += gen_loss.item()
+            r_disc_loss += disc_loss.item()
+            # Cleanup
+            del l_resized, img_lab_orig, ab_groundtruth, z_ground, raw_conv8_output, ab_output, target_truth, target_false
+            #torch.cuda.empty_cache()
+            batch += 1
+
+    gen_test_loss = r_gen_loss / len(test_loader)
+    disc_test_loss = r_disc_loss / len(test_loader)
+    psnr_loss = psnr_metric.compute()
+    ssim_loss = ssim_metric.compute()
+    temp_file_generator.write(f"Test Generator Loss: {gen_test_loss}\n")
+    temp_file_discriminator.write(f"Test Discriminator Loss:{disc_test_loss}\n")
+    temp_file_generator.write(f"PSNR: {psnr_loss}\n")
+    temp_file_generator.write(f"SSIM: {ssim_loss}\n")
+    temp_file_generator.flush()
+    temp_file_discriminator.flush()
+    return temp_file_generator, temp_file_discriminator
+
+

@@ -181,7 +181,7 @@ def adv_base_model_main(checkpoint, epoch):
     disc_parameters_to_optimize = discriminator.parameters()
     lr_gen = 0.0002
     lr_disc = 0.00002
-    num_epochs = 20
+    num_epochs = 40
 
     gen_optimizer = optim.Adam(gen_parameters_to_optimize, lr=lr_gen, betas=(0.5, 0.999))
     disc_optimizer = optim.Adam(disc_parameters_to_optimize, lr=lr_disc, betas=(0.5, 0.999))
@@ -359,4 +359,4 @@ def adv_patch_model_main(checkpoint, epoch):
 #torch.backends.cudnn.deterministic = True
 torch.cuda.empty_cache()
 
-adv_base_model_main(False, 1)
+adv_base_model_main(True, 15)
