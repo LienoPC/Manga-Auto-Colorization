@@ -27,6 +27,46 @@ from torchmetrics import StructuralSimilarityIndexMeasure
 from P2PDiscriminator import PatchGAN
 
 
+def batch_l_channel_to_rgb(l_batch):
+    """
+    Convert a batch of L-channel images (B, 1, H, W) to RGB (B, 3, H, W),
+    assuming neutral A and B channels.
+
+    Args:
+        l_batch (torch.Tensor or np.ndarray): Batch of L-channel images with shape (B, 1, H, W)
+
+    Returns:
+        np.ndarray: Batch of RGB images with shape (B, 3, H, W), normalized to [0, 1] (float32)
+    """
+    if isinstance(l_batch, torch.Tensor):
+        l_batch = l_batch.cpu().numpy()  # Convert to NumPy if it's a PyTorch tensor
+
+        # Ensure shape (B, 1, H, W) → (B, H, W)
+    l_batch = l_batch[:, 0, :, :]
+
+    # Scale L from [0, 100] to [0, 255] for OpenCV compatibility
+    l_batch = (l_batch * 255 / 100).astype(np.uint8)
+
+    B, H, W = l_batch.shape
+
+    # Create A and B channels filled with 128 (neutral color)
+    a_channel = np.full((B, H, W), 128, dtype=np.uint8)
+    b_channel = np.full((B, H, W), 128, dtype=np.uint8)
+
+    # Stack to form LAB images (B, H, W, 3)
+    lab_batch = np.stack([l_batch, a_channel, b_channel], axis=-1)
+
+    # Convert LAB to RGB for each image in the batch
+    rgb_batch = np.array([cv2.cvtColor(lab_img, cv2.COLOR_LAB2RGB) for lab_img in lab_batch])
+
+    # Convert to PyTorch format: (B, H, W, 3) → (B, 3, H, W)
+    rgb_batch = np.transpose(rgb_batch, (0, 3, 1, 2))
+
+    # Normalize to [0, 1] for deep learning (optional)
+    rgb_batch = rgb_batch.astype(np.float32) / 255.0
+
+    return torch.tensor(rgb_batch)  # Return as PyTorch tenso
+
 def lab_to_rgb_batch(lab_tensors):
     """Convert a batch of LAB tensors (BATCH, 3, HEIGHT, WIDTH) to RGB tensors with the same shape."""
     batch_size, _, height, width = lab_tensors.shape
@@ -100,6 +140,8 @@ def test_zhang(device, test_loader, lab_normalization, img_dim, model_path):
             l_resized = l_resized.to(device)
             img_lab_orig = img_lab_orig.to(device)
 
+            l_rgb = batch_l_channel_to_rgb(l_resized)
+            save_rgb_batch_as_jpg(l_rgb, f"{save_dir}/Input", 'patch', batch)
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth_val = img_lab_orig[:, 1:3, :, :]
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
@@ -122,7 +164,7 @@ def test_zhang(device, test_loader, lab_normalization, img_dim, model_path):
             gen_lab_out = lab_to_rgb_batch(gen_lab_out)
             img_lab_orig = lab_to_rgb_batch(img_lab_orig)
             save_rgb_batch_as_jpg(gen_lab_out, save_dir, 'patch', batch)
-            #save_rgb_batch_as_jpg(img_lab_orig, f"{save_dir}/Original", 'patch', batch)
+            save_rgb_batch_as_jpg(img_lab_orig, f"{save_dir}/Original", 'patch', batch)
 
 
 
