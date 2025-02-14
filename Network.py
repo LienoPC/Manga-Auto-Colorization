@@ -157,8 +157,6 @@ class ZhangColorizationNetwork(nn.Module):
 def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, temp_file, quantized_colorspace, epoch, pixel):
     model.train()  # Set the model to training mode
     running_loss = 0.0
-    pixel_loss_criterion = nn.MSELoss()
-    pixel_loss = 0.0
     for batch_idx, (l_resized, img_lab_orig) in enumerate(trainloader):
         # Get the LAB original image
         optimizer.zero_grad()
@@ -172,23 +170,20 @@ def zhang_train_step(model, trainloader, device, optimizer, lab_normalization, t
 
         # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
         ab_groundtruth = resize_to_64x64(ab_groundtruth)
+
         z_ground, _ = inverse_h_mapping(ab_groundtruth, quantized_colorspace)
+
 
         # Apply the model
         raw_conv8_output, ab_output = model(l_resized)
-        '''
-        print("\n\nZ Space printed:\n ")
-        print(f"Predicted Z: \n shape:")
-        print(raw_conv8_output.shape)
-        print("\n\n")
-        print(raw_conv8_output)
-        print(f"Ground Z: \n  shape:")
-        print(z_ground.shape)
-        print("\n\n")
-        print(z_ground)
-        '''
+        ab_output = lab_normalization.normalize_ab(ab_output)
+        ab_output = resize_to_64x64(ab_output)
+
+        z_predicted, _ = inverse_h_mapping(ab_output, quantized_colorspace)
+
+
         # Compute the custom loss over the Z space
-        z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output, z_ground_truth=z_ground)
+        z_loss = multinomial_cross_entropy_loss_L(raw_network_output=z_predicted, z_ground_truth=z_ground)
 
 
         loss = z_loss
@@ -208,8 +203,7 @@ def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, t
     # Validation
     model.eval()  # Set the model to evaluation mode
     running_loss = 0.0
-    pixel_loss_criterion = nn.MSELoss()
-    pixel_loss = 0
+
     with torch.no_grad():
         for l_resized_val, img_lab_orig_val in validloader:
             l_resized_val = l_resized_val.to(device)
@@ -217,14 +211,18 @@ def zhang_valid_step(model, validloader, device, optimizer, lab_normalization, t
 
             # Extract the ground truth ab and convert it to tensor
             ab_groundtruth_val = img_lab_orig_val[:, 1:3, :, :]
-            ab_groundtruth = lab_normalization.normalize_ab(ab_groundtruth)
+            ab_groundtruth_val = lab_normalization.normalize_ab(ab_groundtruth_val)
             # Resize the ground truth and apply soft-encoding (using nearest neighbor) to map Yab to Zab
             ab_groundtruth_val = resize_to_64x64(ab_groundtruth_val)
             z_ground_val, _ = inverse_h_mapping(ab_groundtruth_val, quantized_colorspace)
 
             # Apply the model
             raw_conv8_output_val, ab_output = model(l_resized_val)
-            z_loss = multinomial_cross_entropy_loss_L(raw_network_output=raw_conv8_output_val,
+            ab_output = lab_normalization.normalize_ab(ab_output)
+            ab_output = resize_to_64x64(ab_output)
+            z_predicted_val, _ = inverse_h_mapping(ab_output, quantized_colorspace)
+
+            z_loss = multinomial_cross_entropy_loss_L(raw_network_output=z_predicted_val,
                                                       z_ground_truth=z_ground_val)
 
             loss = z_loss

@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.init as init
 
 from AdversarialNetwork import adv_train_step, adv_valid_step
-from Network import ZhangColorizationNetwork, quantized_bins, zhang_train_step
+from Network import ZhangColorizationNetwork, quantized_bins, zhang_train_step, zhang_valid_step
 from P2PDiscriminator import PatchGAN, adv_patch_train_step, adv_patch_valid_step
 
 
@@ -136,7 +136,7 @@ def zhang_train(model, trainloader, validloader, device, optimizer, lab_normaliz
                                                               temp_file_train,
                                                               quantized_colorspace, epoch, False)
 
-        temp_file_valid, valid_loss = zhang_train_step(model, validloader, device,
+        temp_file_valid, valid_loss = zhang_valid_step(model, validloader, device,
                                                               optimizer, lab_normalization,
                                                               temp_file_valid,
                                                               quantized_colorspace, epoch, False)

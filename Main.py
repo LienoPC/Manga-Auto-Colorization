@@ -74,8 +74,8 @@ def zhang_model_main(checkpoint=False, epoch=0):
 
     # Optimizer
     parameters_to_optimize = module.parameters()
-    lr = 0.001
-    num_epochs = 15
+    lr = 0.0001
+    num_epochs = 25
 
 
     optimizer = optim.Adam(parameters_to_optimize, lr=lr, betas=(0.5, 0.999))
