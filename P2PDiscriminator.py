@@ -62,7 +62,7 @@ def adv_patch_train_step(generator, discriminator, trainloader, device, gen_opti
     # Loss multiply factors
     DISCRIMINATOR_LOSS_THRESHOLD = 0.4
     PIXEL_FACTOR = 1.0
-    Z_LOSS_FACTOR = 3.0
+    Z_LOSS_FACTOR = 1.0
 
 
     # Calculate output of image discriminator (PatchGAN)
@@ -171,7 +171,7 @@ def adv_patch_valid_step(generator, discriminator, validloader, device, gen_opti
     # Loss multiply factors
     DISCRIMINATOR_LOSS_THRESHOLD = 0.4
     PIXEL_FACTOR = 1.0
-    Z_LOSS_FACTOR = 3.0
+    Z_LOSS_FACTOR = 1.0
 
     # Validation
     generator.eval()

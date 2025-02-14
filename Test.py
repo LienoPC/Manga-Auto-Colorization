@@ -54,7 +54,7 @@ def test_zhang_main():
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, drop_last=False)
 
     img_dim = 256
-    model_path = "SavedModels/Good/ZHANG_Epoch_25/checkpoint.pth"
+    model_path = "SavedModels/ZHANG_Epoch_25/checkpoint.pth"
     file_gen = test_zhang(device, test_loader, lab_normalization, img_dim, model_path)
     store_test([("Model", file_gen)], "Zhang")
 
@@ -113,9 +113,9 @@ def test_patch_main():
 
 
 test_zhang_main()
-file_train = open("SavedModels/Good/ZHANG_Epoch_25/Train.txt", "r")
-file_valid = open("SavedModels/Good/ZHANG_Epoch_25/Valid.txt", "r")
+file_train = open("SavedModels/ZHANG_Epoch_25/Train.txt", "r")
+file_valid = open("SavedModels/ZHANG_Epoch_25/Valid.txt", "r")
 
 
-#plot_loss([file_train], "Train", False)
-#plot_loss([file_valid], "Valid", False)
+plot_loss([file_train], "Train", False)
+plot_loss([file_valid], "Valid", False)
